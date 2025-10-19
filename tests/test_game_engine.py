@@ -271,5 +271,69 @@ class TestGameEngineIntegration(unittest.TestCase):
         return food_count
 
 
+class TestGameEngineReinitialization(unittest.TestCase):
+    """Tests for environment reinitialization to prevent KeyError issues"""
+    
+    def setUp(self):
+        """Set up test fixtures"""
+        self.config = Config()
+        self.config.initial_grid_size = 5
+        self.config.level_progress_percentage_required = 0.25
+        self.config.limit_tick_speed = True
+        self.game_engine = GameEngine(self.config)
+        self.game_engine.initialize_game()
+    
+    def test_reinitialize_clears_old_environment(self):
+        """Test that reinitialize properly clears old environment state"""
+        # Get initial environment
+        initial_env = self.game_engine.environment_repository
+        initial_env_id = id(initial_env.environment)
+        
+        # Perform reinitialization
+        self.game_engine.check_for_level_progress_and_reinitialize()
+        
+        # Get new environment
+        new_env = self.game_engine.environment_repository
+        new_env_id = id(new_env.environment)
+        
+        # The environment object should be different (recreated)
+        self.assertNotEqual(initial_env_id, new_env_id, 
+                          "Environment should be recreated during reinitialize")
+        
+        # Should have exactly 1 snake and 1 food after reinit
+        food_count = 0
+        snake_count = 0
+        for location_id in new_env.get_locations():
+            location = new_env.get_location_by_id(location_id)
+            for entity_id in location.getEntities():
+                entity = location.getEntity(entity_id)
+                if hasattr(entity, 'getName'):
+                    if entity.getName() == "Food":
+                        food_count += 1
+                    elif entity.getName() == "Snake Part":
+                        snake_count += 1
+        
+        self.assertEqual(food_count, 1, "Should have exactly 1 food after reinit")
+        self.assertEqual(snake_count, 1, "Should have exactly 1 snake part after reinit")
+    
+    def test_multiple_reinitializations_no_stale_entities(self):
+        """Test that multiple reinitializations don't leave stale entity references"""
+        # Perform multiple reinitializations
+        for i in range(3):
+            self.game_engine.check_for_level_progress_and_reinitialize()
+            
+            # After each reinit, verify we can iterate through all entities without KeyError
+            try:
+                for location_id in self.game_engine.environment_repository.get_locations():
+                    location = self.game_engine.environment_repository.get_location_by_id(location_id)
+                    for entity_id in location.getEntities():
+                        # This would raise KeyError if entity_id doesn't exist
+                        entity = location.getEntity(entity_id)
+                        # Verify entity is valid
+                        self.assertIsNotNone(entity)
+            except KeyError as e:
+                self.fail(f"KeyError on iteration {i+1}: {e}. Stale entity references present.")
+
+
 if __name__ == '__main__':
     unittest.main()

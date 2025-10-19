@@ -212,31 +212,41 @@ class Ophidian:
 
     def check_for_level_progress_and_reinitialize(self):
         logging.info("Checking for level progress...")
-        if (
-                self.snake_part_repository.get_length()
-                > self.environment_repository.get_num_locations()
-                * self.config.level_progress_percentage_required
-        ):
+        
+        # Check if level is complete for sound effects
+        is_level_complete = (
+            self.snake_part_repository.get_length()
+            > self.environment_repository.get_num_locations()
+            * self.config.level_progress_percentage_required
+        )
+        
+        if is_level_complete:
             logging.info("The ophidian has progressed to the next level.")
             # Play level complete sound
-            if hasattr(self, 'audio_manager'):
+            if not self.use_text_ui and hasattr(self, 'audio_manager'):
                 self.audio_manager.play_sound_effect("level_complete")
-            self.game_score.level_complete()
-            self.level += 1
         else:
             # Play collision/death sound
-            if hasattr(self, 'audio_manager'):
+            if not self.use_text_ui and hasattr(self, 'audio_manager'):
                 self.audio_manager.play_sound_effect("collision")
-            self.game_score.reset()
-
-        self.save_game_state()
-
-        logging.info("Reinitializing the environment...")
-        self.environment_repository.reinitialize(self.level)
-        logging.info("Clearing the environment repository")
-        self.environment_repository.clear()
-        logging.info("Re-initializing the game")
-        self.initialize()
+        
+        # Delegate to game engine for core logic
+        self.game_engine.check_for_level_progress_and_reinitialize()
+        
+        # Recreate renderer with new environment references (GUI mode only)
+        if not self.use_text_ui:
+            self.renderer = Renderer(
+                self.collision,
+                self.config,
+                self.environment_repository,
+                self.snake_part_repository,
+                self.game_score,
+                self.game_display
+            )
+            # Update GUI input handler with new snake part
+            self.gui_input_handler = GUIInputHandler(self.config, self.selected_snake_part)
+            # Initialize renderer settings
+            self.initialize()
 
     def quit_application(self):
         self.save_game_state()
