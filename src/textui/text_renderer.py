@@ -110,8 +110,13 @@ class TextRenderer:
     def enable_raw_mode(self):
         """Enable raw mode for non-blocking keyboard input"""
         if os.name != 'nt':
-            self.old_settings = termios.tcgetattr(sys.stdin)
-            tty.setcbreak(sys.stdin.fileno())
+            try:
+                self.old_settings = termios.tcgetattr(sys.stdin)
+                tty.setcbreak(sys.stdin.fileno())
+            except (termios.error, OSError):
+                # No TTY available (e.g., in CI environment)
+                # Skip raw mode - test mode will handle input differently
+                self.old_settings = None
 
     def disable_raw_mode(self):
         """Disable raw mode and restore terminal settings"""

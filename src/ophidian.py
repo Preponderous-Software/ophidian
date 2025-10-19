@@ -32,9 +32,10 @@ logging.basicConfig(level=getattr(logging, log_level))
 logger = logging.getLogger(__name__)
 
 class Ophidian:
-    def __init__(self, use_text_ui=False):
+    def __init__(self, use_text_ui=False, skip_terminal_init=False):
         # Set UI mode first
         self.use_text_ui = use_text_ui
+        self.skip_terminal_init = skip_terminal_init
         
         # Initialize pygame conditionally
         if not self.use_text_ui:
@@ -95,7 +96,8 @@ class Ophidian:
         """Initialize text UI-specific components"""
         from src.textui.text_renderer import TextRenderer
         text_renderer = TextRenderer(self.config)
-        text_renderer.enable_raw_mode()
+        if not self.skip_terminal_init:
+            text_renderer.enable_raw_mode()
         
         # Text UI renderer adapter
         self.text_ui_renderer = TextUIRenderer(text_renderer)

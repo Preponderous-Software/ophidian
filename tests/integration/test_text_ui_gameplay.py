@@ -30,7 +30,8 @@ class TextUIGameplayTest:
         self.config = Config()
         self.config.initial_grid_size = 5  # Small grid for faster testing
         self.config.limit_tick_speed = False  # Run as fast as possible
-        self.ophidian = Ophidian(use_text_ui=True)
+        # Skip terminal init for CI/testing environments without TTY
+        self.ophidian = Ophidian(use_text_ui=True, skip_terminal_init=True)
         self.test_passed = False
         self.errors = []
         
