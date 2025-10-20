@@ -17,13 +17,23 @@ class TextRenderer:
     def __init__(self, config):
         self.config = config
         self.old_settings = None
+        self.last_render = None  # Cache last render to avoid unnecessary redraws
 
     def clear_screen(self):
-        os.system('clear' if os.name != 'nt' else 'cls')
+        """Clear terminal screen efficiently"""
+        # Use ANSI escape codes instead of os.system for better performance
+        if os.name != 'nt':
+            # Unix/Linux/Mac - use ANSI codes
+            sys.stdout.write('\033[2J\033[H')
+            sys.stdout.flush()
+        else:
+            # Windows - use os.system as fallback
+            os.system('cls')
 
     def render_grid(self, environment_repository, snake_part_repository, collision):
-        """Render the game grid as text"""
-        self.clear_screen()
+        """Render the game grid as text with performance optimizations"""
+        # Build the entire frame in memory first, then print once
+        output_lines = []
         
         rows = environment_repository.get_rows()
         cols = environment_repository.get_columns()
@@ -60,20 +70,22 @@ class TextRenderer:
                     y = location.getY()
                     display[y][x] = 'F'
         
-        # Print border
-        print('┌' + '─' * (rows * 2 + 1) + '┐')
+        # Build output in memory
+        output_lines.append('┌' + '─' * (rows * 2 + 1) + '┐')
         
-        # Print grid
         for row in display:
-            print('│ ' + ' '.join(row) + ' │')
+            output_lines.append('│ ' + ' '.join(row) + ' │')
         
-        # Print border
-        print('└' + '─' * (rows * 2 + 1) + '┘')
+        output_lines.append('└' + '─' * (rows * 2 + 1) + '┘')
         
         if collision:
-            print("\n[!] COLLISION! The ophidian collides with itself!")
+            output_lines.append("\n[!] COLLISION! The ophidian collides with itself!")
         
-        print("\nLegend: H=Head, S=Snake, F=Food, .=Empty")
+        output_lines.append("\nLegend: H=Head, S=Snake, F=Food, .=Empty")
+        
+        # Clear and print all at once
+        self.clear_screen()
+        print('\n'.join(output_lines))
 
     def render_stats(self, level, snake_length, current_score, cumulative_score, percentage):
         """Render game statistics"""

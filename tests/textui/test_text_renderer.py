@@ -16,16 +16,18 @@ class TestTextRenderer(unittest.TestCase):
         self.assertEqual(self.text_renderer.config, self.config)
         self.assertIsNone(self.text_renderer.old_settings)
     
-    @patch('src.textui.text_renderer.os.system')
-    def test_clear_screen_unix(self, mock_system):
-        """Test clear_screen on Unix-like systems"""
+    @patch('src.textui.text_renderer.sys.stdout')
+    def test_clear_screen_unix(self, mock_stdout):
+        """Test clear_screen on Unix-like systems (using ANSI codes)"""
         with patch('src.textui.text_renderer.os.name', 'posix'):
             self.text_renderer.clear_screen()
-            mock_system.assert_called_once_with('clear')
+            # Check that ANSI escape codes were written
+            mock_stdout.write.assert_called_once_with('\033[2J\033[H')
+            mock_stdout.flush.assert_called_once()
     
     @patch('src.textui.text_renderer.os.system')
     def test_clear_screen_windows(self, mock_system):
-        """Test clear_screen on Windows"""
+        """Test clear_screen on Windows (using os.system fallback)"""
         with patch('src.textui.text_renderer.os.name', 'nt'):
             self.text_renderer.clear_screen()
             mock_system.assert_called_once_with('cls')

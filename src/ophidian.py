@@ -350,13 +350,30 @@ class Ophidian:
     
     def run_text_ui(self):
         """Run the game with text-based UI"""
+        import time
+        
+        # Track framerate for text UI
+        last_frame_time = time.time()
+        frame_duration = 1.0 / self.config.text_ui_target_fps if hasattr(self.config, 'text_ui_target_fps') else 1.0 / 30
+        
         while self.running:
-            if self.current_state == MenuState.MAIN_MENU:
-                self.run_text_menu()
-            elif self.current_state == MenuState.GAME:
-                self.run_text_game_loop()
-            elif self.current_state == MenuState.EXIT:
-                self.quit_application()
+            # Calculate delta time
+            current_time = time.time()
+            delta_time = current_time - last_frame_time
+            
+            # Framerate limiting - only update if enough time has passed
+            if delta_time >= frame_duration:
+                last_frame_time = current_time
+                
+                if self.current_state == MenuState.MAIN_MENU:
+                    self.run_text_menu()
+                elif self.current_state == MenuState.GAME:
+                    self.run_text_game_loop()
+                elif self.current_state == MenuState.EXIT:
+                    self.quit_application()
+            else:
+                # Sleep for a tiny bit to avoid busy waiting and reduce CPU usage
+                time.sleep(0.001)
         
         self.quit_application()
     
@@ -390,10 +407,8 @@ class Ophidian:
         game_state = self.game_engine.get_game_state()
         self.text_ui_renderer.render_game(game_state)
         
-        # Get input using abstraction
-        action = self.text_input_handler.get_input(
-            timeout=self.config.tick_speed if self.config.limit_tick_speed else 0.01
-        )
+        # Get input using abstraction with very short timeout for responsive controls
+        action = self.text_input_handler.get_input(timeout=0.01)
         
         # Handle input actions
         if action != InputAction.NONE:
