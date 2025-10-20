@@ -8,6 +8,8 @@ from src.snake.snakePartRepository import SnakePartRepository
 from src.snake.snakeColorGenerator import SnakeColorGenerator
 from src.environment.pyEnvLibEnvironmentRepositoryImpl import PyEnvLibEnvironmentRepositoryImpl
 from src.score.game_score import GameScore
+from src.score.high_score_entry import HighScoreEntry
+from src.score.high_score_repository import HighScoreRepository
 from src.state.game_state_repository import GameStateRepository
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,7 @@ class GameEngine:
     def __init__(self, config):
         self.config = config
         self.state_repository = GameStateRepository()
+        self.high_score_repository = HighScoreRepository()
         
         # Game state
         self.level = 1
@@ -35,6 +38,9 @@ class GameEngine:
         self.environment_repository = None
         self.game_score = None
         self.selected_snake_part = None
+        
+        # Track maximum snake length for high score entry
+        self.max_snake_length = 0
     
     def initialize_game(self):
         """Initialize or reset the game state"""
@@ -103,6 +109,7 @@ class GameEngine:
     def handle_restart(self):
         """Handle game restart"""
         logger.info("Restarting the game...")
+        self._save_high_score_if_eligible()
         self.game_score.reset()
         self.check_for_level_progress_and_reinitialize()
     
@@ -126,6 +133,11 @@ class GameEngine:
         # Update score
         self.game_score.calculate()
         
+        # Track maximum snake length
+        current_length = self.snake_part_repository.get_length()
+        if current_length > self.max_snake_length:
+            self.max_snake_length = current_length
+        
         # Handle tick timing
         if self.config.limit_tick_speed:
             self.tick += 1
@@ -143,6 +155,8 @@ class GameEngine:
             self.game_score.level_complete()
             self.level += 1
         else:
+            # Game ended (player died), save high score
+            self._save_high_score_if_eligible()
             self.game_score.reset()
 
         self.save_game_state()
@@ -153,6 +167,20 @@ class GameEngine:
         self.environment_repository.clear()
         logger.info("Re-initializing the game")
         self._initialize_level()
+    
+    def _save_high_score_if_eligible(self):
+        """Save high score if the current score qualifies"""
+        if self.game_score and self.game_score.cumulative_points > 0:
+            entry = HighScoreEntry(
+                score=self.game_score.cumulative_points,
+                length=self.max_snake_length,
+                level=self.level
+            )
+            is_high_score = self.high_score_repository.add_score(entry)
+            if is_high_score:
+                logger.info(f"New high score! Score: {entry.score}, Length: {entry.length}, Level: {entry.level}")
+            # Reset max length for next game
+            self.max_snake_length = 0
     
     def get_game_state(self):
         """Get current game state for rendering"""
