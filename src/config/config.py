@@ -9,6 +9,9 @@ import pygame
 # @since August 6th, 2022
 class Config:
     def __init__(self):
+        # UI mode
+        self.use_text_ui = False
+        
         # display
         self.display_width = 500
         self.display_height = 500
@@ -33,6 +36,9 @@ class Config:
         # tick speed
         self.limit_tick_speed = True
         self.tick_speed = 0.1
+        
+        # text UI performance settings
+        self.text_ui_target_fps = 30  # Target framerate for text UI (30 FPS is smooth enough for terminal)
 
         # difficulty settings
         self.difficulty = "Normal"  # Easy, Normal, Hard
@@ -73,6 +79,7 @@ class Config:
     def save_settings(self):
         """Save current settings to file"""
         settings = {
+            'use_text_ui': self.use_text_ui,
             'display_width': self.display_width,
             'display_height': self.display_height,
             'fullscreen': self.fullscreen,
@@ -81,6 +88,7 @@ class Config:
             'sfx_volume': self.sfx_volume,
             'limit_tick_speed': self.limit_tick_speed,
             'tick_speed': self.tick_speed,
+            'text_ui_target_fps': self.text_ui_target_fps,
             'difficulty': self.difficulty,
             'initial_grid_size': self.initial_grid_size,
             'level_progress_percentage_required': self.level_progress_percentage_required,
@@ -100,6 +108,7 @@ class Config:
             with open('config/settings.json', 'r') as f:
                 settings = json.load(f)
                 
+            self.use_text_ui = settings.get('use_text_ui', self.use_text_ui)
             self.display_width = settings.get('display_width', self.display_width)
             self.display_height = settings.get('display_height', self.display_height)
             self.fullscreen = settings.get('fullscreen', self.fullscreen)
@@ -108,6 +117,7 @@ class Config:
             self.sfx_volume = settings.get('sfx_volume', self.sfx_volume)
             self.limit_tick_speed = settings.get('limit_tick_speed', self.limit_tick_speed)
             self.tick_speed = settings.get('tick_speed', self.tick_speed)
+            self.text_ui_target_fps = settings.get('text_ui_target_fps', self.text_ui_target_fps)
             self.difficulty = settings.get('difficulty', self.difficulty)
             self.initial_grid_size = settings.get('initial_grid_size', self.initial_grid_size)
             self.level_progress_percentage_required = settings.get('level_progress_percentage_required', self.level_progress_percentage_required)

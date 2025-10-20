@@ -8,6 +8,17 @@ from src.input.keyDownEventHandler import KeyDownEventHandler
 class TestKeyDownEventHandler(unittest.TestCase):
     def setUp(self):
         self.config = MagicMock()
+        self.config.key_bindings = {
+            'quit': pygame.K_q,
+            'move_up': pygame.K_w,
+            'move_left': pygame.K_a,
+            'move_down': pygame.K_s,
+            'move_right': pygame.K_d,
+            'fullscreen': pygame.K_F11,
+            'restart': pygame.K_r
+        }
+        self.config.fullscreen = False
+        self.config.limit_tick_speed = True
         self.game_display = MagicMock()
         self.selected_snake_part = MagicMock()
         self.handler = KeyDownEventHandler(self.config, self.game_display, self.selected_snake_part)

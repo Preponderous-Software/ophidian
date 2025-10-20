@@ -13,3 +13,7 @@ class SnakePartRepository:
 
     def clear(self):
         self.snake_parts.clear()
+    
+    def get_all(self):
+        """Return a copy of all snake parts"""
+        return list(self.snake_parts)
