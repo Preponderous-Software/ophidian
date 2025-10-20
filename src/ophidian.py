@@ -485,6 +485,11 @@ class Ophidian:
         elif new_state == MenuState.MAIN_MENU and self.current_state == MenuState.GAME:
             # Save game state when returning to menu
             self.save_game_state()
+        elif new_state == MenuState.HIGH_SCORES:
+            # Refresh high scores when entering the high scores menu
+            if hasattr(self, 'high_scores_menu'):
+                self.high_scores_menu.refresh_scores()
+                self.high_scores_menu.scroll_offset = 0  # Reset scroll position
         
         self.current_state = new_state
 
