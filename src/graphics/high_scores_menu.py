@@ -12,10 +12,21 @@ class HighScoresMenu:
         self.high_score_repository = HighScoreRepository()
         self.scroll_offset = 0
         self.max_visible_scores = 8  # Number of scores visible on screen at once
+        self._cached_high_scores = None  # Cache for high scores
+    
+    def refresh_scores(self):
+        """Reload high scores from repository"""
+        self._cached_high_scores = self.high_score_repository.load()
+    
+    def _get_high_scores(self):
+        """Get high scores, loading them if not cached"""
+        if self._cached_high_scores is None:
+            self.refresh_scores()
+        return self._cached_high_scores
 
     def handle_key_down(self, key):
         """Handle keyboard input - return to main menu on escape or enter, scroll with arrow keys"""
-        high_scores = self.high_score_repository.load()
+        high_scores = self._get_high_scores()
         max_scroll = max(0, len(high_scores) - self.max_visible_scores)
         
         if key == pygame.K_ESCAPE or key == pygame.K_RETURN:
@@ -56,7 +67,7 @@ class HighScoresMenu:
         )
         
         # Load high scores
-        high_scores = self.high_score_repository.load()
+        high_scores = self._get_high_scores()
         
         if not high_scores:
             # No scores yet
@@ -93,6 +104,9 @@ class HighScoresMenu:
             score_spacing = 45
             text_size = self.config.text_size // 3
             
+            # Bronze color for 3rd place
+            bronze_color = (205, 127, 50)
+            
             # Calculate which scores to display based on scroll offset
             start_idx = self.scroll_offset
             end_idx = min(start_idx + self.max_visible_scores, len(high_scores))
@@ -107,7 +121,7 @@ class HighScoresMenu:
                 elif i == 1:
                     color = self.config.white  # Silver for 2nd
                 elif i == 2:
-                    color = (205, 127, 50)  # Bronze for 3rd (approximate)
+                    color = bronze_color  # Bronze for 3rd
                 else:
                     color = self.config.white
                 

@@ -19,6 +19,15 @@ class HighScoreEntry:
         self.level = level
         self.timestamp = timestamp or datetime.now().isoformat()
     
+    def __eq__(self, other):
+        """Compare two high score entries for equality"""
+        if not isinstance(other, HighScoreEntry):
+            return False
+        return (self.score == other.score and 
+                self.length == other.length and 
+                self.level == other.level and 
+                self.timestamp == other.timestamp)
+    
     def to_dict(self):
         """Convert to dictionary for JSON serialization"""
         return {

@@ -120,8 +120,9 @@ class TestHighScoreRepository(unittest.TestCase):
     
     def test_load_nonexistent_file(self):
         """Test loading when file doesn't exist"""
-        # Use a non-existent file path
-        repo = HighScoreRepository(file_path='/tmp/nonexistent_high_scores.json')
+        # Use a non-existent file path in a cross-platform way
+        nonexistent_path = os.path.join(tempfile.gettempdir(), 'nonexistent_high_scores.json')
+        repo = HighScoreRepository(file_path=nonexistent_path)
         loaded = repo.load()
         self.assertEqual(loaded, [])
     
