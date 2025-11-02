@@ -244,6 +244,24 @@ class Ophidian:
     def removeEntity(self, entity: Entity):
         self.removeEntityFromLocation(entity)
 
+    def increaseSnakeSpeed(self):
+        """Decrease tick speed to make snake faster"""
+        self.config.tickSpeed = max(
+            self.config.minTickSpeed,
+            self.config.tickSpeed - self.config.tickSpeedStep
+        )
+
+    def decreaseSnakeSpeed(self):
+        """Increase tick speed to make snake slower"""
+        self.config.tickSpeed = min(
+            self.config.maxTickSpeed,
+            self.config.tickSpeed + self.config.tickSpeedStep
+        )
+
+    def toggleTickSpeedLimit(self):
+        """Toggle tick speed limiting on/off"""
+        self.config.limitTickSpeed = not self.config.limitTickSpeed
+
     def handleKeyDownEvent(self, key):
         # For text UI, key is a character; for pygame, it's a key code
         if self.config.useTextUI:
@@ -282,22 +300,11 @@ class Ophidian:
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
             elif key == 'l':
-                if self.config.limitTickSpeed:
-                    self.config.limitTickSpeed = False
-                else:
-                    self.config.limitTickSpeed = True
+                self.toggleTickSpeedLimit()
             elif key == '+' or key == '=':
-                # Decrease tick speed (faster snake)
-                self.config.tickSpeed = max(
-                    self.config.minTickSpeed,
-                    self.config.tickSpeed - self.config.tickSpeedStep
-                )
+                self.increaseSnakeSpeed()
             elif key == '-' or key == '_':
-                # Increase tick speed (slower snake)
-                self.config.tickSpeed = min(
-                    self.config.maxTickSpeed,
-                    self.config.tickSpeed + self.config.tickSpeedStep
-                )
+                self.decreaseSnakeSpeed()
         else:
             # Pygame key handling
             if key == self.pygame.K_q:
@@ -337,25 +344,14 @@ class Ophidian:
                     self.config.fullscreen = True
                 self.initializeGameDisplay()
             elif key == self.pygame.K_l:
-                if self.config.limitTickSpeed:
-                    self.config.limitTickSpeed = False
-                else:
-                    self.config.limitTickSpeed = True
+                self.toggleTickSpeedLimit()
             elif key == self.pygame.K_r:
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
             elif key == self.pygame.K_PLUS or key == self.pygame.K_EQUALS:
-                # Decrease tick speed (faster snake)
-                self.config.tickSpeed = max(
-                    self.config.minTickSpeed,
-                    self.config.tickSpeed - self.config.tickSpeedStep
-                )
+                self.increaseSnakeSpeed()
             elif key == self.pygame.K_MINUS or key == self.pygame.K_UNDERSCORE:
-                # Increase tick speed (slower snake)
-                self.config.tickSpeed = min(
-                    self.config.maxTickSpeed,
-                    self.config.tickSpeed + self.config.tickSpeedStep
-                )
+                self.decreaseSnakeSpeed()
 
     def getRandomDirection(self, grid: Grid, location: Location):
         direction = random.randrange(0, 4)
