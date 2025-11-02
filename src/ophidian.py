@@ -281,6 +281,23 @@ class Ophidian:
             elif key == 'r':
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
+            elif key == 'l':
+                if self.config.limitTickSpeed:
+                    self.config.limitTickSpeed = False
+                else:
+                    self.config.limitTickSpeed = True
+            elif key == '+' or key == '=':
+                # Decrease tick speed (faster snake)
+                self.config.tickSpeed = max(
+                    self.config.minTickSpeed,
+                    self.config.tickSpeed - self.config.tickSpeedStep
+                )
+            elif key == '-' or key == '_':
+                # Increase tick speed (slower snake)
+                self.config.tickSpeed = min(
+                    self.config.maxTickSpeed,
+                    self.config.tickSpeed + self.config.tickSpeedStep
+                )
         else:
             # Pygame key handling
             if key == self.pygame.K_q:
@@ -327,6 +344,18 @@ class Ophidian:
             elif key == self.pygame.K_r:
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
+            elif key == self.pygame.K_PLUS or key == self.pygame.K_EQUALS:
+                # Decrease tick speed (faster snake)
+                self.config.tickSpeed = max(
+                    self.config.minTickSpeed,
+                    self.config.tickSpeed - self.config.tickSpeedStep
+                )
+            elif key == self.pygame.K_MINUS or key == self.pygame.K_UNDERSCORE:
+                # Increase tick speed (slower snake)
+                self.config.tickSpeed = min(
+                    self.config.maxTickSpeed,
+                    self.config.tickSpeed + self.config.tickSpeedStep
+                )
 
     def getRandomDirection(self, grid: Grid, location: Location):
         direction = random.randrange(0, 4)

@@ -30,6 +30,8 @@ s / ↓ | move down
 d / → | move right
 f11 | fullscreen (graphical UI only)
 l | toggle tick speed limit
++ / = | increase speed (faster snake)
+- / _ | decrease speed (slower snake)
 r | restart
 q | quit
 

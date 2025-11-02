@@ -26,6 +26,9 @@ class Config:
         # tick speed
         self.limitTickSpeed = True
         self.tickSpeed = 0.2
+        self.minTickSpeed = 0.05
+        self.maxTickSpeed = 1.0
+        self.tickSpeedStep = 0.05
 
         # misc
         self.debug = False
