@@ -11,6 +11,7 @@ from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
 from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
 from progression.shop import currencyEarnedForRun, listUpgrades, purchaseUpgrade
+from progression.lore import generateOphidianName, getBiome
 
 
 # @author Daniel McCoy Stephenson
@@ -37,6 +38,9 @@ class Ophidian:
             self.textRenderer.enableRawMode()
         
         self.saveManager = SaveManager()
+        if self.saveManager.data["ophidianName"] is None:
+            self.saveManager.data["ophidianName"] = generateOphidianName()
+            self.saveManager.save()
         self.lastObituary = None
         self.running = True
         self.snakeParts = []
@@ -560,8 +564,11 @@ class Ophidian:
                 "Level " + str(self.level), self.config.gridSize + (self.level - 1) * 2
             )
         self.initializeLocationWidthAndHeight()
+        biome = getBiome(self.level)
         if not self.config.useTextUI:
-            self.pygame.display.set_caption("Ophidian - Level " + str(self.level))
+            self.pygame.display.set_caption(
+                f"Ophidian - {biome['name']} (Level {self.level})"
+            )
         self.selectedSnakePart = SnakePart(self.resolveSelectedCosmeticColor())
         self.environment.addEntity(self.selectedSnakePart)
         self.snakeParts.append(self.selectedSnakePart)
@@ -571,7 +578,8 @@ class Ophidian:
                 self.spawnSnakePart(
                     self.selectedSnakePart.getTail(), self.selectedSnakePart.getColor()
                 )
-        print("The ophidian enters the world.")
+        ophidianName = self.saveManager.data["ophidianName"]
+        print(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
         self.spawnFood()
 
     def run(self):
