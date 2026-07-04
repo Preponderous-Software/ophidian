@@ -7,6 +7,7 @@ from food.food import Food
 from lib.pyenvlib.grid import Grid
 from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
+from progression.save import SaveManager
 
 
 # @author Daniel McCoy Stephenson
@@ -32,6 +33,7 @@ class Ophidian:
             self.textRenderer = TextRenderer(self.config)
             self.textRenderer.enableRawMode()
         
+        self.saveManager = SaveManager()
         self.running = True
         self.snakeParts = []
         self.level = 1
@@ -126,7 +128,18 @@ class Ophidian:
             self.level += 1
         self.initialize()
 
+    def recordCurrentRun(self, causeOfDeath):
+        self.saveManager.recordRun(
+            length=len(self.snakeParts),
+            level=self.level,
+            ticks=self.tick,
+            score=self.score,
+            causeOfDeath=causeOfDeath,
+        )
+
     def quitApplication(self):
+        if not self.collision:
+            self.recordCurrentRun("quit")
         self.displayStatsInConsole()
         if self.config.useTextUI:
             self.textRenderer.disableRawMode()
@@ -169,6 +182,7 @@ class Ophidian:
                 # we have a collision
                 self.collision = True
                 print("The ophidian collides with itself and ceases to be.")
+                self.recordCurrentRun("collision")
                 if not self.config.useTextUI:
                     self.drawEnvironment()
                     self.pygame.display.update()
