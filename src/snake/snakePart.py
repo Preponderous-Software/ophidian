@@ -43,3 +43,6 @@ class SnakePart(Entity):
 
     def getColor(self):
         return self.color
+
+    def setColor(self, color):
+        self.color = color

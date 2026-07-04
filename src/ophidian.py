@@ -54,6 +54,8 @@ class Ophidian:
         # an effective tick speed each run without compounding across restarts
         self.baseTickSpeed = self.config.tickSpeed
         self.ascensionBonus = None
+        self.uiMessage = None
+        self.uiMessageExpiresAt = 0
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -151,10 +153,8 @@ class Ophidian:
                 self.ascensionBonus = applyAscension(self.saveManager.data)
                 self.saveManager.save()
                 self.level = 1
-                print(
-                    "The ophidian ascends! (Ascension",
-                    self.saveManager.data["ascensionLevel"],
-                    ")",
+                self.notify(
+                    f"The ophidian ascends! (Ascension {self.saveManager.data['ascensionLevel']})"
                 )
             else:
                 self.level += 1
@@ -175,7 +175,7 @@ class Ophidian:
         newlyUnlocked = checkForNewUnlocks(self.saveManager.data)
         if newlyUnlocked:
             for skinId in newlyUnlocked:
-                print("New skin unlocked: " + getSkinName(skinId) + "!")
+                self.notify("New skin unlocked: " + getSkinName(skinId) + "!")
             self.saveManager.save()
         self.printObituaryToConsole()
 
@@ -191,6 +191,26 @@ class Ophidian:
         ):
             print(line)
         print("-----")
+
+    def notify(self, message):
+        """Player-facing feedback: always printed to console (which is the
+        whole UI in text mode) and, in pygame mode, also surfaced as a brief
+        on-screen banner via drawUiMessage() so it isn't invisible behind the
+        graphical window."""
+        print(message)
+        if not self.config.useTextUI:
+            self.uiMessage = message
+            self.uiMessageExpiresAt = time.time() + 2.0
+
+    def drawUiMessage(self):
+        if self.config.useTextUI or self.uiMessage is None:
+            return
+        if time.time() >= self.uiMessageExpiresAt:
+            self.uiMessage = None
+            return
+        width, _ = self.gameDisplay.get_size()
+        self.graphik.drawRectangle(0, 0, width, 30, self.config.black)
+        self.graphik.drawText(self.uiMessage, width // 2, 15, 16, self.config.white)
 
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
@@ -264,7 +284,7 @@ class Ophidian:
                 # only the second collision in the same run actually kills
                 if self.secondWindAvailableThisRun:
                     self.secondWindAvailableThisRun = False
-                    print("The ophidian narrowly survives!")
+                    self.notify("The ophidian narrowly survives!")
                     return
                 # we have a collision
                 self.collision = True
@@ -347,11 +367,16 @@ class Ophidian:
         self.removeEntityFromLocation(entity)
 
     def openShop(self):
-        """Console-based shop menu (MVP). In text-UI mode, raw terminal mode
-        is temporarily disabled so plain input() works; in pygame mode this
-        just prints the same menu to stdout as a placeholder."""
+        """Opens the upgrade shop. Text UI gets a console menu (that's its
+        native UI); pygame mode gets a real in-window screen (runPygameShop)
+        instead of blocking on stdin behind the graphical window."""
         if self.config.useTextUI:
-            self.textRenderer.disableRawMode()
+            self.openTextShop()
+        else:
+            self.runPygameShop()
+
+    def openTextShop(self):
+        self.textRenderer.disableRawMode()
         try:
             data = self.saveManager.data
             upgrades = listUpgrades()
@@ -379,8 +404,76 @@ class Ophidian:
                     if success:
                         self.saveManager.save()
         finally:
-            if self.config.useTextUI:
-                self.textRenderer.enableRawMode()
+            self.textRenderer.enableRawMode()
+
+    def runPygameShop(self):
+        """Self-contained in-window shop screen: its own small event loop
+        (poll -> handle -> draw -> present) until the player closes it, same
+        shape as the main pygame loop but scoped to just the shop. Nothing
+        here ever blocks on stdin, so the graphical window stays live and
+        responsive the whole time."""
+        upgrades = listUpgrades()
+        selectedIndex = 0
+        viewingShop = True
+        while viewingShop:
+            for event in self.pygame.event.get():
+                if event.type == self.pygame.QUIT:
+                    self.quitApplication()
+                elif event.type == self.pygame.KEYDOWN:
+                    if event.key in (self.pygame.K_UP, self.pygame.K_w):
+                        selectedIndex = (selectedIndex - 1) % len(upgrades)
+                    elif event.key in (self.pygame.K_DOWN, self.pygame.K_s):
+                        selectedIndex = (selectedIndex + 1) % len(upgrades)
+                    elif event.key in (self.pygame.K_RETURN, self.pygame.K_SPACE):
+                        success, message = purchaseUpgrade(
+                            self.saveManager.data, upgrades[selectedIndex]["id"]
+                        )
+                        if success:
+                            self.saveManager.save()
+                        self.notify(message)
+                    elif event.key in (self.pygame.K_ESCAPE, self.pygame.K_p):
+                        viewingShop = False
+            self.drawShopScreen(upgrades, selectedIndex)
+            self.pygame.display.update()
+            self.pygame.time.delay(16)
+
+    def drawShopScreen(self, upgrades, selectedIndex):
+        width, height = self.gameDisplay.get_size()
+        self.graphik.drawRectangle(0, 0, width, height, self.config.black)
+        self.graphik.drawText("Ophidian Shop", width // 2, 30, 28, self.config.white)
+        self.graphik.drawText(
+            "Currency: {}".format(self.saveManager.data.get("currency", 0)),
+            width // 2,
+            60,
+            18,
+            self.config.yellow,
+        )
+        purchasedUpgrades = self.saveManager.data.get("purchasedUpgrades", [])
+        rowHeight = 60
+        startY = 100
+        for index, upgrade in enumerate(upgrades):
+            rowY = startY + index * rowHeight
+            if index == selectedIndex:
+                self.graphik.drawRectangle(
+                    20, rowY - 5, width - 40, rowHeight - 10, (60, 60, 60)
+                )
+            owned = upgrade["id"] in purchasedUpgrades
+            label = "{} - cost {}{}".format(
+                upgrade["name"], upgrade["cost"], " (owned)" if owned else ""
+            )
+            color = self.config.green if owned else self.config.white
+            self.graphik.drawText(label, width // 2, rowY + 12, 20, color)
+            self.graphik.drawText(
+                upgrade["description"], width // 2, rowY + 34, 14, (180, 180, 180)
+            )
+        hintY = startY + len(upgrades) * rowHeight + 10
+        self.graphik.drawText(
+            "W/S or Up/Down: navigate   Enter: purchase   Esc/P: close",
+            width // 2,
+            hintY,
+            14,
+            (160, 160, 160),
+        )
 
     def handleKeyDownEvent(self, key):
         # For text UI, key is a character; for pygame, it's a key code
@@ -481,7 +574,9 @@ class Ophidian:
         nextCosmetic = getNextCosmeticId(self.saveManager.data, currentCosmetic)
         self.saveManager.data["selectedCosmetic"] = nextCosmetic
         self.saveManager.save()
-        print("Skin selected: " + getSkinName(nextCosmetic))
+        # apply immediately to the live snake part, not just on next restart
+        self.selectedSnakePart.setColor(self.resolveSelectedCosmeticColor())
+        self.notify("Skin selected: " + getSkinName(nextCosmetic))
 
     def getRandomDirection(self, grid: Grid, location: Location):
         direction = random.randrange(0, 4)
@@ -606,7 +701,7 @@ class Ophidian:
                     self.selectedSnakePart.getTail(), self.selectedSnakePart.getColor()
                 )
         ophidianName = self.saveManager.data["ophidianName"]
-        print(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
+        self.notify(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
         self.spawnFood()
         if self.ascensionBonus is not None:
             for _ in range(self.ascensionBonus["startingBonusSegments"]):
@@ -705,6 +800,7 @@ class Ophidian:
                 )
             self.pygame.draw.rect(self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1)
 
+            self.drawUiMessage()
             self.pygame.display.update()
 
             if self.config.limitTickSpeed:
