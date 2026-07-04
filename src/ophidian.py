@@ -8,6 +8,11 @@ from lib.pyenvlib.grid import Grid
 from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
+from progression.ascension import (
+    computeGridSizeForLevel,
+    shouldAscend,
+    applyAscension,
+)
 
 
 # @author Daniel McCoy Stephenson
@@ -37,6 +42,8 @@ class Ophidian:
         self.running = True
         self.snakeParts = []
         self.level = 1
+        self.ascensionBonus = None
+        self._baseTickSpeed = self.config.tickSpeed
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -125,7 +132,22 @@ class Ophidian:
             > len(self.environment.grid.getLocations())
             * self.config.levelProgressPercentageRequired
         ):
-            self.level += 1
+            if shouldAscend(
+                self.level,
+                self.config.gridSize,
+                self.config.minGridSize,
+                self.config.maxGridSize,
+            ):
+                self.ascensionBonus = applyAscension(self.saveManager.data)
+                self.saveManager.save()
+                self.level = 1
+                print(
+                    "The ophidian ascends! (Ascension",
+                    self.saveManager.data["ascensionLevel"],
+                    ")",
+                )
+            else:
+                self.level += 1
         self.initialize()
 
     def recordCurrentRun(self, causeOfDeath):
@@ -414,13 +436,16 @@ class Ophidian:
         self.score = 0
         self.snakeParts = []
         self.tick = 0
-        if self.level == 1:
-            self.environment = Environment(
-                "Level " + str(self.level), self.config.gridSize
-            )
-        else:
-            self.environment = Environment(
-                "Level " + str(self.level), self.config.gridSize + (self.level - 1) * 2
+        gridSize = computeGridSizeForLevel(
+            self.level,
+            self.config.gridSize,
+            self.config.minGridSize,
+            self.config.maxGridSize,
+        )
+        self.environment = Environment("Level " + str(self.level), gridSize)
+        if self.ascensionBonus is not None:
+            self.config.tickSpeed = (
+                self._baseTickSpeed * self.ascensionBonus["tickSpeedMultiplier"]
             )
         self.initializeLocationWidthAndHeight()
         if not self.config.useTextUI:
@@ -436,6 +461,10 @@ class Ophidian:
         self.snakeParts.append(self.selectedSnakePart)
         print("The ophidian enters the world.")
         self.spawnFood()
+        if self.ascensionBonus is not None:
+            for _ in range(self.ascensionBonus["startingBonusSegments"]):
+                tail = self.selectedSnakePart.getTail()
+                self.spawnSnakePart(tail, tail.getColor())
 
     def run(self):
         if self.config.useTextUI:
