@@ -8,6 +8,7 @@ from lib.pyenvlib.grid import Grid
 from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
+from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
 
 
 # @author Daniel McCoy Stephenson
@@ -136,6 +137,11 @@ class Ophidian:
             score=self.score,
             causeOfDeath=causeOfDeath,
         )
+        newlyUnlocked = checkForNewUnlocks(self.saveManager.data)
+        if newlyUnlocked:
+            for skinId in newlyUnlocked:
+                print("New skin unlocked: " + getSkinName(skinId) + "!")
+            self.saveManager.save()
 
     def quitApplication(self):
         if not self.collision:
@@ -295,6 +301,8 @@ class Ophidian:
             elif key == 'r':
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
+            elif key == 'c':
+                self.cycleSelectedCosmetic()
         else:
             # Pygame key handling
             if key == self.pygame.K_q:
@@ -341,6 +349,15 @@ class Ophidian:
             elif key == self.pygame.K_r:
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"
+            elif key == self.pygame.K_c:
+                self.cycleSelectedCosmetic()
+
+    def cycleSelectedCosmetic(self):
+        currentCosmetic = self.saveManager.data.get("selectedCosmetic", "default")
+        nextCosmetic = getNextCosmeticId(self.saveManager.data, currentCosmetic)
+        self.saveManager.data["selectedCosmetic"] = nextCosmetic
+        self.saveManager.save()
+        print("Skin selected: " + getSkinName(nextCosmetic))
 
     def getRandomDirection(self, grid: Grid, location: Location):
         direction = random.randrange(0, 4)
@@ -409,6 +426,18 @@ class Ophidian:
 
         self.environment.addEntity(food)
 
+    def resolveSelectedCosmeticColor(self):
+        # Falls back to the original random-color behavior for "default"
+        # or any unresolvable/unknown cosmetic id.
+        color = getSkinColor(self.saveManager.data.get("selectedCosmetic", "default"))
+        if color is not None:
+            return color
+        return (
+            random.randrange(50, 200),
+            random.randrange(50, 200),
+            random.randrange(50, 200),
+        )
+
     def initialize(self):
         self.collision = False
         self.score = 0
@@ -425,13 +454,7 @@ class Ophidian:
         self.initializeLocationWidthAndHeight()
         if not self.config.useTextUI:
             self.pygame.display.set_caption("Ophidian - Level " + str(self.level))
-        self.selectedSnakePart = SnakePart(
-            (
-                random.randrange(50, 200),
-                random.randrange(50, 200),
-                random.randrange(50, 200),
-            )
-        )
+        self.selectedSnakePart = SnakePart(self.resolveSelectedCosmeticColor())
         self.environment.addEntity(self.selectedSnakePart)
         self.snakeParts.append(self.selectedSnakePart)
         print("The ophidian enters the world.")
