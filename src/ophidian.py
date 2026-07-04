@@ -8,6 +8,7 @@ from lib.pyenvlib.grid import Grid
 from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
+from progression.obituary import formatObituaryScreen
 
 
 # @author Daniel McCoy Stephenson
@@ -34,6 +35,7 @@ class Ophidian:
             self.textRenderer.enableRawMode()
         
         self.saveManager = SaveManager()
+        self.lastObituary = None
         self.running = True
         self.snakeParts = []
         self.level = 1
@@ -129,17 +131,56 @@ class Ophidian:
         self.initialize()
 
     def recordCurrentRun(self, causeOfDeath):
-        self.saveManager.recordRun(
+        self.lastObituary = self.saveManager.recordRun(
             length=len(self.snakeParts),
             level=self.level,
             ticks=self.tick,
             score=self.score,
             causeOfDeath=causeOfDeath,
         )
+        self.printObituaryToConsole()
+
+    def printObituaryToConsole(self):
+        """Prints the just-recorded obituary and lifetime chronicle to the console.
+
+        Called once per run-ending event (from recordCurrentRun), so this
+        never doubles up even when restartUponCollision immediately starts a
+        new life.
+        """
+        for line in formatObituaryScreen(
+            self.lastObituary, self.saveManager.data["lifetimeStats"]
+        ):
+            print(line)
+        print("-----")
+
+    def renderObituaryScreen(self):
+        """Briefly overlays the obituary + chronicle screen on the pygame display.
+
+        No-op for the text UI (which gets its version via
+        printObituaryToConsole) and when there's nothing recorded yet.
+        """
+        if self.config.useTextUI or self.lastObituary is None:
+            return
+        lines = formatObituaryScreen(
+            self.lastObituary, self.saveManager.data["lifetimeStats"]
+        )
+        width, height = self.gameDisplay.get_size()
+        self.graphik.drawRectangle(0, 0, width, height, self.config.black)
+        lineHeight = 24
+        startY = height // 2 - (len(lines) * lineHeight) // 2
+        for index, line in enumerate(lines):
+            if not line:
+                continue
+            self.graphik.drawText(
+                line, width // 2, startY + index * lineHeight, 18, self.config.white
+            )
+        self.pygame.display.update()
+        time.sleep(1.5)
 
     def quitApplication(self):
         if not self.collision:
             self.recordCurrentRun("quit")
+            self.renderObituaryScreen()
         self.displayStatsInConsole()
         if self.config.useTextUI:
             self.textRenderer.disableRawMode()
@@ -186,6 +227,7 @@ class Ophidian:
                 if not self.config.useTextUI:
                     self.drawEnvironment()
                     self.pygame.display.update()
+                    self.renderObituaryScreen()
                 time.sleep(self.config.tickSpeed * 20)
                 if self.config.restartUponCollision:
                     self.checkForLevelProgressAndReinitialize()
