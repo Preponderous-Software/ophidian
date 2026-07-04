@@ -39,5 +39,22 @@ def test_notify_is_console_only_in_text_ui_mode(tmp_path, monkeypatch):
 
     game.notify("hello")
 
-    # text UI has no pygame banner state to set
-    assert game.uiMessage is None
+    # text UI has no pygame banner queue to populate
+    assert game.uiMessageQueue == []
+
+
+def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
+    # regression test: checkForLevelProgressAndReinitialize's ascension
+    # notify() is immediately followed by initialize()'s biome-arrival
+    # notify() in the same synchronous call chain, before any frame is ever
+    # drawn - a single-slot uiMessage would silently lose the first message
+    game = _makeGame(monkeypatch, tmp_path)
+    game.config.useTextUI = False  # pretend pygame mode without a real display
+
+    game.notify("The ophidian ascends! (Ascension 1)")
+    game.notify("Medusa enters The Sunken Grove.")
+
+    assert list(game.uiMessageQueue) == [
+        "The ophidian ascends! (Ascension 1)",
+        "Medusa enters The Sunken Grove.",
+    ]

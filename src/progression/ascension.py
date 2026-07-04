@@ -40,7 +40,10 @@ def applyAscension(saveData):
     )
 
     ascensionsPerBonusSegment = 3
-    startingBonusSegments = ascensionLevel // ascensionsPerBonusSegment
+    maxStartingBonusSegments = 5
+    startingBonusSegments = min(
+        ascensionLevel // ascensionsPerBonusSegment, maxStartingBonusSegments
+    )
 
     return {
         "tickSpeedMultiplier": tickSpeedMultiplier,

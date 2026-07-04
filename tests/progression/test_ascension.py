@@ -74,3 +74,37 @@ def test_apply_ascension_twice_increments_by_one_each_time_not_compounding():
     assert saveData["ascensionLevel"] == 1
     applyAscension(saveData)
     assert saveData["ascensionLevel"] == 2
+
+
+def test_apply_ascension_bonus_segments_stay_capped_after_many_ascensions():
+    # regression test: startingBonusSegments must stay bounded (the
+    # docstring promises a "small, bounded" bonus) - it must never grow to
+    # the point spawnSnakePart could struggle to place segments on a
+    # freshly-reset, minimum-size grid
+    saveData = {"ascensionLevel": 0}
+    for _ in range(50):
+        bonus = applyAscension(saveData)
+    assert saveData["ascensionLevel"] == 50
+    assert bonus["startingBonusSegments"] <= 5
+
+
+def test_default_config_reaches_all_curated_biome_levels_before_ascending():
+    # regression test: with the actual default Config values, the level
+    # counter must reach at least level 6 (the last curated biome in
+    # progression/lore.py's BIOME_TABLE) before shouldAscend fires and
+    # resets it back to 1 - otherwise curated biome content is silently
+    # unreachable dead code
+    from config.config import Config
+
+    config = Config()
+    highestLevelReached = 1
+    level = 1
+    for _ in range(20):
+        if shouldAscend(
+            level, config.gridSize, config.minGridSize, config.maxGridSize
+        ):
+            level = 1
+        else:
+            level += 1
+            highestLevelReached = max(highestLevelReached, level)
+    assert highestLevelReached >= 6

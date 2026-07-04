@@ -54,8 +54,12 @@ class Ophidian:
         # an effective tick speed each run without compounding across restarts
         self.baseTickSpeed = self.config.tickSpeed
         self.ascensionBonus = None
-        self.uiMessage = None
-        self.uiMessageExpiresAt = 0
+        # queue (not a single slot) so back-to-back notify() calls in the same
+        # tick - e.g. an ascension message immediately followed by the next
+        # biome's arrival message - don't clobber each other before either is
+        # ever drawn; each is shown in turn instead of only the last one.
+        self.uiMessageQueue = []
+        self.uiMessageExpiresAt = None
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -194,23 +198,29 @@ class Ophidian:
 
     def notify(self, message):
         """Player-facing feedback: always printed to console (which is the
-        whole UI in text mode) and, in pygame mode, also surfaced as a brief
+        whole UI in text mode) and, in pygame mode, also queued as a brief
         on-screen banner via drawUiMessage() so it isn't invisible behind the
-        graphical window."""
+        graphical window. Queued rather than a single slot, so several
+        notify() calls firing back-to-back (e.g. an ascension message
+        immediately followed by the next run's biome-arrival message) each
+        get their turn instead of the earlier one being silently lost."""
         print(message)
         if not self.config.useTextUI:
-            self.uiMessage = message
-            self.uiMessageExpiresAt = time.time() + 2.0
+            self.uiMessageQueue.append(message)
 
     def drawUiMessage(self):
-        if self.config.useTextUI or self.uiMessage is None:
+        if self.config.useTextUI or not self.uiMessageQueue:
             return
+        if self.uiMessageExpiresAt is None:
+            self.uiMessageExpiresAt = time.time() + 2.0
         if time.time() >= self.uiMessageExpiresAt:
-            self.uiMessage = None
-            return
+            self.uiMessageQueue.pop(0)
+            self.uiMessageExpiresAt = None
+            if not self.uiMessageQueue:
+                return
         width, _ = self.gameDisplay.get_size()
         self.graphik.drawRectangle(0, 0, width, 30, self.config.black)
-        self.graphik.drawText(self.uiMessage, width // 2, 15, 16, self.config.white)
+        self.graphik.drawText(self.uiMessageQueue[0], width // 2, 15, 16, self.config.white)
 
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
@@ -293,8 +303,9 @@ class Ophidian:
                 if not self.config.useTextUI:
                     self.drawEnvironment()
                     self.pygame.display.update()
-                    self.renderObituaryScreen()
                 time.sleep(self.config.tickSpeed * 20)
+                if not self.config.useTextUI:
+                    self.renderObituaryScreen()
                 if self.config.restartUponCollision:
                     self.checkForLevelProgressAndReinitialize()
                 else:
@@ -414,6 +425,7 @@ class Ophidian:
         responsive the whole time."""
         upgrades = listUpgrades()
         selectedIndex = 0
+        shopMessage = None
         viewingShop = True
         while viewingShop:
             for event in self.pygame.event.get():
@@ -430,14 +442,19 @@ class Ophidian:
                         )
                         if success:
                             self.saveManager.save()
-                        self.notify(message)
+                        # drawn directly on the shop screen below rather than
+                        # via notify()/drawUiMessage() - this loop never calls
+                        # drawUiMessage(), so that banner would never actually
+                        # be seen while still inside the shop
+                        print(message)
+                        shopMessage = message
                     elif event.key in (self.pygame.K_ESCAPE, self.pygame.K_p):
                         viewingShop = False
-            self.drawShopScreen(upgrades, selectedIndex)
+            self.drawShopScreen(upgrades, selectedIndex, shopMessage)
             self.pygame.display.update()
             self.pygame.time.delay(16)
 
-    def drawShopScreen(self, upgrades, selectedIndex):
+    def drawShopScreen(self, upgrades, selectedIndex, shopMessage=None):
         width, height = self.gameDisplay.get_size()
         self.graphik.drawRectangle(0, 0, width, height, self.config.black)
         self.graphik.drawText("Ophidian Shop", width // 2, 30, 28, self.config.white)
@@ -474,6 +491,10 @@ class Ophidian:
             14,
             (160, 160, 160),
         )
+        if shopMessage:
+            self.graphik.drawText(
+                shopMessage, width // 2, hintY + 24, 16, self.config.yellow
+            )
 
     def handleKeyDownEvent(self, key):
         # For text UI, key is a character; for pygame, it's a key code
