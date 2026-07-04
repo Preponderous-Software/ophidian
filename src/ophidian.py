@@ -10,6 +10,7 @@ from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
 from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
+from progression.shop import currencyEarnedForRun, listUpgrades, purchaseUpgrade
 
 
 # @author Daniel McCoy Stephenson
@@ -40,6 +41,9 @@ class Ophidian:
         self.running = True
         self.snakeParts = []
         self.level = 1
+        # base tick speed captured once so shop upgrades can derive an
+        # effective tick speed each run without compounding across restarts
+        self.baseTickSpeed = self.config.tickSpeed
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -132,6 +136,10 @@ class Ophidian:
         self.initialize()
 
     def recordCurrentRun(self, causeOfDeath):
+        # bank currency earned this run before folding it into lifetime stats;
+        # recordRun() below calls saveManager.save() which persists both
+        earnedCurrency = currencyEarnedForRun(len(self.snakeParts))
+        self.saveManager.data["currency"] = self.saveManager.data.get("currency", 0) + earnedCurrency
         self.lastObituary = self.saveManager.recordRun(
             length=len(self.snakeParts),
             level=self.level,
@@ -226,6 +234,13 @@ class Ophidian:
         for eid in newLocation.getEntities():
             e = newLocation.getEntity(eid)
             if type(e) is SnakePart:
+                # second_wind upgrade: the first collision each run is
+                # converted into a near-miss instead of ending the run;
+                # only the second collision in the same run actually kills
+                if self.secondWindAvailableThisRun:
+                    self.secondWindAvailableThisRun = False
+                    print("The ophidian narrowly survives!")
+                    return
                 # we have a collision
                 self.collision = True
                 print("The ophidian collides with itself and ceases to be.")
@@ -306,6 +321,42 @@ class Ophidian:
     def removeEntity(self, entity: Entity):
         self.removeEntityFromLocation(entity)
 
+    def openShop(self):
+        """Console-based shop menu (MVP). In text-UI mode, raw terminal mode
+        is temporarily disabled so plain input() works; in pygame mode this
+        just prints the same menu to stdout as a placeholder."""
+        if self.config.useTextUI:
+            self.textRenderer.disableRawMode()
+        try:
+            data = self.saveManager.data
+            upgrades = listUpgrades()
+            purchasedUpgrades = data.get("purchasedUpgrades", [])
+            print("\n=== Ophidian Shop ===")
+            print("Currency: {}".format(data.get("currency", 0)))
+            for index, upgrade in enumerate(upgrades, start=1):
+                ownedTag = " (owned)" if upgrade["id"] in purchasedUpgrades else ""
+                print(
+                    "{}. {} - cost {}{}".format(
+                        index, upgrade["name"], upgrade["cost"], ownedTag
+                    )
+                )
+                print("   {}".format(upgrade["description"]))
+            print("0. Exit shop")
+            choice = input("Choose an upgrade to purchase (0 to exit): ").strip()
+            if choice and choice != "0":
+                try:
+                    selectedUpgrade = upgrades[int(choice) - 1]
+                except (ValueError, IndexError):
+                    print("Invalid selection.")
+                else:
+                    success, message = purchaseUpgrade(data, selectedUpgrade["id"])
+                    print(message)
+                    if success:
+                        self.saveManager.save()
+        finally:
+            if self.config.useTextUI:
+                self.textRenderer.enableRawMode()
+
     def handleKeyDownEvent(self, key):
         # For text UI, key is a character; for pygame, it's a key code
         if self.config.useTextUI:
@@ -345,6 +396,9 @@ class Ophidian:
                 return "restart"
             elif key == 'c':
                 self.cycleSelectedCosmetic()
+            elif key == 'p':
+                self.openShop()
+                return "restart"
         else:
             # Pygame key handling
             if key == self.pygame.K_q:
@@ -393,6 +447,9 @@ class Ophidian:
                 return "restart"
             elif key == self.pygame.K_c:
                 self.cycleSelectedCosmetic()
+            elif key == self.pygame.K_p:
+                self.openShop()
+                return "restart"
 
     def cycleSelectedCosmetic(self):
         currentCosmetic = self.saveManager.data.get("selectedCosmetic", "default")
@@ -485,6 +542,15 @@ class Ophidian:
         self.score = 0
         self.snakeParts = []
         self.tick = 0
+        purchasedUpgrades = self.saveManager.data.get("purchasedUpgrades", [])
+        # slow_starter upgrade: derive the effective tick speed from the
+        # stored base each time, so it never compounds across restarts
+        if "slow_starter" in purchasedUpgrades and self.level == 1:
+            self.config.tickSpeed = self.baseTickSpeed * 1.25
+        else:
+            self.config.tickSpeed = self.baseTickSpeed
+        # second_wind upgrade: one near-miss available per run, consumed in moveEntity()
+        self.secondWindAvailableThisRun = "second_wind" in purchasedUpgrades
         if self.level == 1:
             self.environment = Environment(
                 "Level " + str(self.level), self.config.gridSize
@@ -499,6 +565,12 @@ class Ophidian:
         self.selectedSnakePart = SnakePart(self.resolveSelectedCosmeticColor())
         self.environment.addEntity(self.selectedSnakePart)
         self.snakeParts.append(self.selectedSnakePart)
+        # head_start upgrade: begin the run with 2 extra pre-grown segments
+        if "head_start" in purchasedUpgrades:
+            for _ in range(2):
+                self.spawnSnakePart(
+                    self.selectedSnakePart.getTail(), self.selectedSnakePart.getColor()
+                )
         print("The ophidian enters the world.")
         self.spawnFood()
 
