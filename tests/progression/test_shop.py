@@ -4,6 +4,7 @@ from progression.save import defaultSaveData
 from progression.shop import (
     UPGRADES,
     currencyEarnedForRun,
+    getActiveUpgradeLabels,
     listUpgrades,
     purchaseUpgrade,
 )
@@ -84,3 +85,28 @@ def test_purchase_upgrade_fails_on_unknown_upgrade():
     assert success is False
     assert saveData["currency"] == 100
     assert "Unknown upgrade" in message
+
+
+def test_get_active_upgrade_labels_empty_when_nothing_purchased():
+    saveData = defaultSaveData()
+    assert getActiveUpgradeLabels(saveData, secondWindAvailableThisRun=True) == []
+
+
+def test_get_active_upgrade_labels_lists_owned_upgrades_in_display_order():
+    saveData = defaultSaveData()
+    saveData["purchasedUpgrades"] = ["slow_starter", "head_start"]
+
+    labels = getActiveUpgradeLabels(saveData, secondWindAvailableThisRun=True)
+
+    assert labels == ["Head Start", "Slow Starter"]
+
+
+def test_get_active_upgrade_labels_shows_second_wind_armed_state():
+    saveData = defaultSaveData()
+    saveData["purchasedUpgrades"] = ["second_wind"]
+
+    armed = getActiveUpgradeLabels(saveData, secondWindAvailableThisRun=True)
+    used = getActiveUpgradeLabels(saveData, secondWindAvailableThisRun=False)
+
+    assert armed == ["Second Wind (armed)"]
+    assert used == ["Second Wind (used)"]

@@ -30,6 +30,8 @@ s / ↓ | move down
 d / → | move right
 f11 | fullscreen (graphical UI only)
 l | toggle tick speed limit
+c | cycle selected cosmetic skin
+p | open the upgrade shop
 r | restart
 q | quit
 

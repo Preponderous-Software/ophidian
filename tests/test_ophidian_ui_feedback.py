@@ -41,7 +41,7 @@ def test_notify_is_console_only_in_text_ui_mode(tmp_path, monkeypatch):
     game.notify("hello")
 
     # text UI has no pygame banner queue to populate
-    assert game.uiMessageQueue == []
+    assert game.uiBanner.queue == []
 
 
 def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
@@ -55,7 +55,7 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
     game.notify("The ophidian ascends! (Ascension 1)")
     game.notify("Medusa enters The Sunken Grove.")
 
-    assert list(game.uiMessageQueue) == [
+    assert list(game.uiBanner.queue) == [
         "The ophidian ascends! (Ascension 1)",
         "Medusa enters The Sunken Grove.",
     ]

@@ -30,6 +30,25 @@ def defaultSaveData():
     }
 
 
+# Registry of migration functions, keyed by the version they upgrade FROM.
+# Each function takes a loaded save dict and returns it upgraded to
+# (fromVersion + 1). Empty today since SAVE_VERSION has never changed - this
+# is the seam a future schema change hooks into, rather than needing to
+# retrofit migration handling into SaveManager._load() at that point.
+MIGRATIONS = {}
+
+
+def migrateSaveData(data):
+    """Upgrades a loaded save dict to SAVE_VERSION by chaining any
+    registered MIGRATIONS, then stamps the current version onto it."""
+    version = data.get("version", SAVE_VERSION)
+    while version in MIGRATIONS:
+        data = MIGRATIONS[version](data)
+        version += 1
+    data["version"] = SAVE_VERSION
+    return data
+
+
 class SaveManager:
     """Loads, holds, and persists the player's cross-run progression state."""
 
@@ -44,6 +63,7 @@ class SaveManager:
                 with open(self.path, "r") as f:
                     loaded = json.load(f)
                 if isinstance(loaded, dict):
+                    loaded = migrateSaveData(loaded)
                     data.update(loaded)
                     # keep nested defaults for any keys a stale save is missing
                     stats = defaultSaveData()["lifetimeStats"]

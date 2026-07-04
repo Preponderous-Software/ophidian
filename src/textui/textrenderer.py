@@ -90,9 +90,20 @@ class TextRenderer:
         bar = '█' * filled + '░' * (bar_length - filled)
         print(f"[{bar}]")
 
+    def renderHud(self, currency, activeUpgradeLabels):
+        """Currency + active-upgrades readout, always visible (not just
+        inside the shop) so the player isn't stuck checking their balance or
+        what they own by reopening the shop mid-run."""
+        print(f"Currency: {currency}")
+        if activeUpgradeLabels:
+            print("Active upgrades: " + ", ".join(activeUpgradeLabels))
+
     def renderControls(self):
         """Render control instructions"""
-        print("\nControls: w/↑=Up, a/←=Left, s/↓=Down, d/→=Right, r=Restart, q=Quit")
+        print(
+            "\nControls: w/↑=Up, a/←=Left, s/↓=Down, d/→=Right, "
+            "c=Cycle skin, p=Shop, r=Restart, q=Quit"
+        )
 
     def enableRawMode(self):
         """Enable raw mode for non-blocking keyboard input"""

@@ -85,3 +85,20 @@ def purchaseUpgrade(saveData, upgradeId):
     saveData["currency"] = currentCurrency - cost
     purchasedUpgrades.append(upgradeId)
     return True, "Purchased {} for {} currency.".format(upgrade["name"], cost)
+
+
+def getActiveUpgradeLabels(saveData, secondWindAvailableThisRun):
+    """Returns a display label for each owned upgrade, so the player can see
+    what's active without having to reopen the shop. second_wind additionally
+    shows whether it's still armed for the current run or already used.
+    """
+    purchasedUpgrades = saveData.get("purchasedUpgrades", [])
+    labels = []
+    for upgrade in listUpgrades():
+        if upgrade["id"] not in purchasedUpgrades:
+            continue
+        label = upgrade["name"]
+        if upgrade["id"] == "second_wind":
+            label += " (armed)" if secondWindAvailableThisRun else " (used)"
+        labels.append(label)
+    return labels

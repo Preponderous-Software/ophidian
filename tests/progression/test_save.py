@@ -1,7 +1,7 @@
 import json
 import os
 
-from progression.save import SaveManager, defaultSaveData
+from progression.save import SAVE_VERSION, SaveManager, defaultSaveData, migrateSaveData
 
 
 def test_new_save_uses_defaults(tmp_path):
@@ -61,3 +61,40 @@ def test_missing_save_file_is_recreated_with_defaults(tmp_path):
     manager = SaveManager(path)
     assert manager.data["currency"] == 0
     assert not os.path.exists(path)  # not written until save() is called
+
+
+def test_migrate_save_data_stamps_current_version_when_missing():
+    data = migrateSaveData({"currency": 5})
+    assert data["version"] == SAVE_VERSION
+    assert data["currency"] == 5
+
+
+def test_migrate_save_data_applies_registered_migrations_in_order(monkeypatch):
+    from progression import save as saveModule
+
+    calls = []
+
+    def upgradeFromVersionOne(data):
+        calls.append(1)
+        data["migratedFromV1"] = True
+        return data
+
+    monkeypatch.setattr(saveModule, "SAVE_VERSION", 2)
+    monkeypatch.setattr(saveModule, "MIGRATIONS", {1: upgradeFromVersionOne})
+
+    result = saveModule.migrateSaveData({"version": 1, "currency": 5})
+
+    assert calls == [1]
+    assert result["migratedFromV1"] is True
+    assert result["version"] == 2
+
+
+def test_save_manager_stamps_version_on_a_save_file_missing_it(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        json.dump({"currency": 7}, f)
+
+    manager = SaveManager(path)
+
+    assert manager.data["version"] == SAVE_VERSION
+    assert manager.data["currency"] == 7

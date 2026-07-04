@@ -8,13 +8,20 @@ from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
 from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
-from progression.shop import currencyEarnedForRun, listUpgrades, purchaseUpgrade
+from progression.shop import (
+    currencyEarnedForRun,
+    getActiveUpgradeLabels,
+    listUpgrades,
+    purchaseUpgrade,
+)
 from progression.lore import generateOphidianName, getBiome
 from progression.ascension import (
     computeGridSizeForLevel,
     shouldAscend,
     applyAscension,
 )
+from ui.banner import UiBanner
+from ui.shop_screen import PygameShopScreen
 
 
 # @author Daniel McCoy Stephenson
@@ -52,12 +59,7 @@ class Ophidian:
         # an effective tick speed each run without compounding across restarts
         self.baseTickSpeed = self.config.tickSpeed
         self.ascensionBonus = None
-        # queue (not a single slot) so back-to-back notify() calls in the same
-        # tick - e.g. an ascension message immediately followed by the next
-        # biome's arrival message - don't clobber each other before either is
-        # ever drawn; each is shown in turn instead of only the last one.
-        self.uiMessageQueue = []
-        self.uiMessageExpiresAt = None
+        self.uiBanner = UiBanner()
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -196,29 +198,40 @@ class Ophidian:
 
     def notify(self, message):
         """Player-facing feedback: always printed to console (which is the
-        whole UI in text mode) and, in pygame mode, also queued as a brief
-        on-screen banner via drawUiMessage() so it isn't invisible behind the
-        graphical window. Queued rather than a single slot, so several
-        notify() calls firing back-to-back (e.g. an ascension message
-        immediately followed by the next run's biome-arrival message) each
-        get their turn instead of the earlier one being silently lost."""
+        whole UI in text mode) and, in pygame mode, also queued on
+        self.uiBanner so it isn't invisible behind the graphical window."""
         print(message)
         if not self.config.useTextUI:
-            self.uiMessageQueue.append(message)
+            self.uiBanner.push(message)
 
     def drawUiMessage(self):
-        if self.config.useTextUI or not self.uiMessageQueue:
+        if self.config.useTextUI:
             return
-        if self.uiMessageExpiresAt is None:
-            self.uiMessageExpiresAt = time.time() + 2.0
-        if time.time() >= self.uiMessageExpiresAt:
-            self.uiMessageQueue.pop(0)
-            self.uiMessageExpiresAt = None
-            if not self.uiMessageQueue:
-                return
         width, _ = self.gameDisplay.get_size()
-        self.graphik.drawRectangle(0, 0, width, 30, self.config.black)
-        self.graphik.drawText(self.uiMessageQueue[0], width // 2, 15, 16, self.config.white)
+        self.uiBanner.draw(self.graphik, width, self.config.black, self.config.white)
+
+    def getActiveUpgradesSummary(self):
+        return getActiveUpgradeLabels(
+            self.saveManager.data, self.secondWindAvailableThisRun
+        )
+
+    def drawHud(self):
+        """Currency + active-upgrades readout, always visible (not just
+        inside the shop) so the player isn't stuck checking their balance or
+        what they own by reopening the shop mid-run. Drawn just below the
+        banner strip so the two never overlap."""
+        if self.config.useTextUI:
+            return
+        width, _ = self.gameDisplay.get_size()
+        currency = self.saveManager.data.get("currency", 0)
+        self.graphik.drawText(
+            f"Currency: {currency}", width // 2, 45, 14, self.config.black
+        )
+        labels = self.getActiveUpgradesSummary()
+        if labels:
+            self.graphik.drawText(
+                " | ".join(labels), width // 2, 63, 12, self.config.black
+            )
 
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
@@ -416,83 +429,17 @@ class Ophidian:
             self.textRenderer.enableRawMode()
 
     def runPygameShop(self):
-        """Self-contained in-window shop screen: its own small event loop
-        (poll -> handle -> draw -> present) until the player closes it, same
-        shape as the main pygame loop but scoped to just the shop. Nothing
-        here ever blocks on stdin, so the graphical window stays live and
-        responsive the whole time."""
-        upgrades = listUpgrades()
-        selectedIndex = 0
-        shopMessage = None
-        viewingShop = True
-        while viewingShop:
-            for event in self.pygame.event.get():
-                if event.type == self.pygame.QUIT:
-                    self.quitApplication()
-                elif event.type == self.pygame.KEYDOWN:
-                    if event.key in (self.pygame.K_UP, self.pygame.K_w):
-                        selectedIndex = (selectedIndex - 1) % len(upgrades)
-                    elif event.key in (self.pygame.K_DOWN, self.pygame.K_s):
-                        selectedIndex = (selectedIndex + 1) % len(upgrades)
-                    elif event.key in (self.pygame.K_RETURN, self.pygame.K_SPACE):
-                        success, message = purchaseUpgrade(
-                            self.saveManager.data, upgrades[selectedIndex]["id"]
-                        )
-                        if success:
-                            self.saveManager.save()
-                        # drawn directly on the shop screen below rather than
-                        # via notify()/drawUiMessage() - this loop never calls
-                        # drawUiMessage(), so that banner would never actually
-                        # be seen while still inside the shop
-                        print(message)
-                        shopMessage = message
-                    elif event.key in (self.pygame.K_ESCAPE, self.pygame.K_p):
-                        viewingShop = False
-            self.drawShopScreen(upgrades, selectedIndex, shopMessage)
-            self.pygame.display.update()
-            self.pygame.time.delay(16)
-
-    def drawShopScreen(self, upgrades, selectedIndex, shopMessage=None):
-        width, height = self.gameDisplay.get_size()
-        self.graphik.drawRectangle(0, 0, width, height, self.config.black)
-        self.graphik.drawText("Ophidian Shop", width // 2, 30, 28, self.config.white)
-        self.graphik.drawText(
-            "Currency: {}".format(self.saveManager.data.get("currency", 0)),
-            width // 2,
-            60,
-            18,
-            self.config.yellow,
-        )
-        purchasedUpgrades = self.saveManager.data.get("purchasedUpgrades", [])
-        rowHeight = 60
-        startY = 100
-        for index, upgrade in enumerate(upgrades):
-            rowY = startY + index * rowHeight
-            if index == selectedIndex:
-                self.graphik.drawRectangle(
-                    20, rowY - 5, width - 40, rowHeight - 10, (60, 60, 60)
-                )
-            owned = upgrade["id"] in purchasedUpgrades
-            label = "{} - cost {}{}".format(
-                upgrade["name"], upgrade["cost"], " (owned)" if owned else ""
-            )
-            color = self.config.green if owned else self.config.white
-            self.graphik.drawText(label, width // 2, rowY + 12, 20, color)
-            self.graphik.drawText(
-                upgrade["description"], width // 2, rowY + 34, 14, (180, 180, 180)
-            )
-        hintY = startY + len(upgrades) * rowHeight + 10
-        self.graphik.drawText(
-            "W/S or Up/Down: navigate   Enter: purchase   Esc/P: close",
-            width // 2,
-            hintY,
-            14,
-            (160, 160, 160),
-        )
-        if shopMessage:
-            self.graphik.drawText(
-                shopMessage, width // 2, hintY + 24, 16, self.config.yellow
-            )
+        """Delegates to PygameShopScreen: its own poll/handle/draw loop,
+        scoped to just the shop, so purchasing upgrades stays visible and
+        interactive without blocking on stdin behind the graphical window."""
+        PygameShopScreen(
+            self.pygame,
+            self.graphik,
+            lambda: self.gameDisplay,
+            self.config,
+            self.saveManager,
+            self.quitApplication,
+        ).run()
 
     def handleKeyDownEvent(self, key):
         # For text UI, key is a character; for pygame, it's a key code
@@ -768,6 +715,10 @@ class Ophidian:
             self.textRenderer.renderStats(
                 self.level, len(self.snakeParts), self.score, percentage
             )
+            self.textRenderer.renderHud(
+                self.saveManager.data.get("currency", 0),
+                self.getActiveUpgradesSummary(),
+            )
             self.textRenderer.renderControls()
 
             if self.config.limitTickSpeed:
@@ -824,6 +775,7 @@ class Ophidian:
                 )
             self.pygame.draw.rect(self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1)
 
+            self.drawHud()
             self.drawUiMessage()
             self.pygame.display.update()
 
