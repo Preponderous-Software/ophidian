@@ -12,6 +12,11 @@ from progression.obituary import formatObituaryScreen
 from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
 from progression.shop import currencyEarnedForRun, listUpgrades, purchaseUpgrade
 from progression.lore import generateOphidianName, getBiome
+from progression.ascension import (
+    computeGridSizeForLevel,
+    shouldAscend,
+    applyAscension,
+)
 
 
 # @author Daniel McCoy Stephenson
@@ -45,9 +50,10 @@ class Ophidian:
         self.running = True
         self.snakeParts = []
         self.level = 1
-        # base tick speed captured once so shop upgrades can derive an
-        # effective tick speed each run without compounding across restarts
+        # base tick speed captured once so shop/ascension bonuses can derive
+        # an effective tick speed each run without compounding across restarts
         self.baseTickSpeed = self.config.tickSpeed
+        self.ascensionBonus = None
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -136,7 +142,22 @@ class Ophidian:
             > len(self.environment.grid.getLocations())
             * self.config.levelProgressPercentageRequired
         ):
-            self.level += 1
+            if shouldAscend(
+                self.level,
+                self.config.gridSize,
+                self.config.minGridSize,
+                self.config.maxGridSize,
+            ):
+                self.ascensionBonus = applyAscension(self.saveManager.data)
+                self.saveManager.save()
+                self.level = 1
+                print(
+                    "The ophidian ascends! (Ascension",
+                    self.saveManager.data["ascensionLevel"],
+                    ")",
+                )
+            else:
+                self.level += 1
         self.initialize()
 
     def recordCurrentRun(self, causeOfDeath):
@@ -547,22 +568,28 @@ class Ophidian:
         self.snakeParts = []
         self.tick = 0
         purchasedUpgrades = self.saveManager.data.get("purchasedUpgrades", [])
-        # slow_starter upgrade: derive the effective tick speed from the
-        # stored base each time, so it never compounds across restarts
+        # effective tick speed is always derived from the stored base each
+        # time (never mutated in place), so ascension/slow_starter bonuses
+        # don't compound across restarts
+        ascensionTickSpeedMultiplier = (
+            self.ascensionBonus["tickSpeedMultiplier"]
+            if self.ascensionBonus is not None
+            else 1
+        )
+        effectiveTickSpeed = self.baseTickSpeed * ascensionTickSpeedMultiplier
+        # slow_starter upgrade: first level only
         if "slow_starter" in purchasedUpgrades and self.level == 1:
-            self.config.tickSpeed = self.baseTickSpeed * 1.25
-        else:
-            self.config.tickSpeed = self.baseTickSpeed
+            effectiveTickSpeed *= 1.25
+        self.config.tickSpeed = effectiveTickSpeed
         # second_wind upgrade: one near-miss available per run, consumed in moveEntity()
         self.secondWindAvailableThisRun = "second_wind" in purchasedUpgrades
-        if self.level == 1:
-            self.environment = Environment(
-                "Level " + str(self.level), self.config.gridSize
-            )
-        else:
-            self.environment = Environment(
-                "Level " + str(self.level), self.config.gridSize + (self.level - 1) * 2
-            )
+        gridSize = computeGridSizeForLevel(
+            self.level,
+            self.config.gridSize,
+            self.config.minGridSize,
+            self.config.maxGridSize,
+        )
+        self.environment = Environment("Level " + str(self.level), gridSize)
         self.initializeLocationWidthAndHeight()
         biome = getBiome(self.level)
         if not self.config.useTextUI:
@@ -581,6 +608,10 @@ class Ophidian:
         ophidianName = self.saveManager.data["ophidianName"]
         print(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
         self.spawnFood()
+        if self.ascensionBonus is not None:
+            for _ in range(self.ascensionBonus["startingBonusSegments"]):
+                tail = self.selectedSnakePart.getTail()
+                self.spawnSnakePart(tail, tail.getColor())
 
     def run(self):
         if self.config.useTextUI:
