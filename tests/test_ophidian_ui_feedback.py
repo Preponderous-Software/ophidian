@@ -2,6 +2,7 @@ from textui.textrenderer import TextRenderer
 
 from ophidian import Ophidian
 from progression.cosmetics import SKINS_BY_ID
+from snake.snakePart import SnakePart
 
 
 def _makeGame(monkeypatch, tmp_path):
@@ -58,3 +59,43 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
         "The ophidian ascends! (Ascension 1)",
         "Medusa enters The Sunken Grove.",
     ]
+
+
+def test_spawn_snake_part_prefers_an_empty_neighbor_over_occupied_ones(
+    tmp_path, monkeypatch
+):
+    # regression test: spawnSnakePart used to pick a random neighbor with no
+    # occupancy check at all, so it could silently stack a new segment
+    # directly on top of an existing one (head_start's 2 segments and
+    # ascension's startingBonusSegments both spawn several in a row). Here
+    # every neighbor except one is deliberately occupied, so a correct
+    # implementation has exactly one legal cell to land on.
+    game = _makeGame(monkeypatch, tmp_path)
+    grid = game.environment.getGrid()
+
+    # the head spawns at a random grid location, which may be on an edge
+    # (missing some neighbors) - move it to the center so all 4 neighbors
+    # are guaranteed to exist, keeping this test deterministic
+    centerX, centerY = grid.getRows() // 2, grid.getColumns() // 2
+    tailLocation = grid.getLocationByCoordinates(centerX, centerY)
+    game.environment.removeEntity(game.selectedSnakePart)
+    game.environment.addEntityToLocation(game.selectedSnakePart, tailLocation)
+
+    # spawnFood() during initialize() may have placed food on any of these
+    # cells before we moved the head here - clear them all so the occupancy
+    # setup below is deterministic regardless of where food landed
+    leftLocation = grid.getLeft(tailLocation)
+    for neighbor in (grid.getUp(tailLocation), grid.getDown(tailLocation), grid.getRight(tailLocation), leftLocation):
+        for entityId in list(neighbor.getEntities().keys()):
+            neighbor.removeEntity(neighbor.getEntity(entityId))
+
+    # selectedSnakePart's direction defaults to 0 (up), which
+    # spawnSnakePart always excludes regardless of occupancy - occupy the
+    # remaining two neighbors, leaving exactly "left" empty
+    game.environment.addEntityToLocation(SnakePart((0, 0, 0)), grid.getDown(tailLocation))
+    game.environment.addEntityToLocation(SnakePart((0, 0, 0)), grid.getRight(tailLocation))
+
+    game.spawnSnakePart(game.selectedSnakePart, (1, 2, 3))
+
+    newSegment = game.snakeParts[-1]
+    assert game.getLocation(newSegment) is grid.getLeft(tailLocation)

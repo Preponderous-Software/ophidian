@@ -4,8 +4,6 @@ from config.config import Config
 from lib.pyenvlib.entity import Entity
 from lib.pyenvlib.environment import Environment
 from food.food import Food
-from lib.pyenvlib.grid import Grid
-from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
@@ -599,17 +597,6 @@ class Ophidian:
         self.selectedSnakePart.setColor(self.resolveSelectedCosmeticColor())
         self.notify("Skin selected: " + getSkinName(nextCosmetic))
 
-    def getRandomDirection(self, grid: Grid, location: Location):
-        direction = random.randrange(0, 4)
-        if direction == 0:
-            return grid.getUp(location)
-        elif direction == 1:
-            return grid.getRight(location)
-        elif direction == 2:
-            return grid.getDown(location)
-        elif direction == 3:
-            return grid.getLeft(location)
-
     def getLocationDirection(self, direction, grid, location):
         if direction == 0:
             return grid.getUp(location)
@@ -620,29 +607,45 @@ class Ophidian:
         elif direction == 3:
             return grid.getRight(location)
 
-    def getLocationOppositeDirection(self, direction, grid, location):
-        if direction == 0:
-            return grid.getDown(location)
-        elif direction == 1:
-            return grid.getRight(location)
-        elif direction == 2:
-            return grid.getUp(location)
-        elif direction == 3:
-            return grid.getLeft(location)
-
     def spawnSnakePart(self, snakePart: SnakePart, color):
         newSnakePart = SnakePart(color)
         snakePart.setPrevious(newSnakePart)
         newSnakePart.setNext(snakePart)
         grid, location = self.getLocationAndGrid(snakePart)
 
-        targetLocation = -1
-        while True:
-            targetLocation = self.getRandomDirection(grid, location)
-            if targetLocation != -1 and targetLocation != self.getLocationDirection(
-                snakePart.getDirection(), grid, location
-            ):
-                break
+        # excludedLocation keeps a new segment out of the cell the snake is
+        # currently facing/heading toward; among the rest, prefer a cell with
+        # no entities so new segments never silently stack on an existing
+        # snake part or hide a food entity underneath one
+        excludedLocation = self.getLocationDirection(
+            snakePart.getDirection(), grid, location
+        )
+        neighbors = [
+            self.getLocationDirection(direction, grid, location)
+            for direction in range(4)
+        ]
+        onGridNeighbors = [
+            neighbor for neighbor in neighbors if neighbor != -1
+        ]
+        emptyCandidates = [
+            neighbor
+            for neighbor in onGridNeighbors
+            if neighbor != excludedLocation and neighbor.getNumEntities() == 0
+        ]
+        if emptyCandidates:
+            targetLocation = random.choice(emptyCandidates)
+        elif onGridNeighbors:
+            # every unoccupied neighbor is taken (or the only one is
+            # excluded) - fall back to any on-grid neighbor rather than
+            # looping forever or crashing on a full grid
+            fallbackCandidates = [
+                neighbor for neighbor in onGridNeighbors if neighbor != excludedLocation
+            ] or onGridNeighbors
+            targetLocation = random.choice(fallbackCandidates)
+        else:
+            # no on-grid neighbors at all (grid too small to have any) -
+            # stack on the current location rather than crashing
+            targetLocation = location
 
         self.environment.addEntityToLocation(newSnakePart, targetLocation)
         self.snakeParts.append(newSnakePart)
