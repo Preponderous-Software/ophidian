@@ -8,6 +8,7 @@ from lib.pyenvlib.grid import Grid
 from lib.pyenvlib.location import Location
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
+from progression.lore import generateOphidianName, getBiome
 
 
 # @author Daniel McCoy Stephenson
@@ -34,6 +35,9 @@ class Ophidian:
             self.textRenderer.enableRawMode()
         
         self.saveManager = SaveManager()
+        if self.saveManager.data["ophidianName"] is None:
+            self.saveManager.data["ophidianName"] = generateOphidianName()
+            self.saveManager.save()
         self.running = True
         self.snakeParts = []
         self.level = 1
@@ -423,8 +427,11 @@ class Ophidian:
                 "Level " + str(self.level), self.config.gridSize + (self.level - 1) * 2
             )
         self.initializeLocationWidthAndHeight()
+        biome = getBiome(self.level)
         if not self.config.useTextUI:
-            self.pygame.display.set_caption("Ophidian - Level " + str(self.level))
+            self.pygame.display.set_caption(
+                f"Ophidian - {biome['name']} (Level {self.level})"
+            )
         self.selectedSnakePart = SnakePart(
             (
                 random.randrange(50, 200),
@@ -434,7 +441,8 @@ class Ophidian:
         )
         self.environment.addEntity(self.selectedSnakePart)
         self.snakeParts.append(self.selectedSnakePart)
-        print("The ophidian enters the world.")
+        ophidianName = self.saveManager.data["ophidianName"]
+        print(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
         self.spawnFood()
 
     def run(self):
