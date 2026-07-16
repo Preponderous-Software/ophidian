@@ -21,7 +21,11 @@ class Config:
         # grid size
         self.gridSize = 5
         self.minGridSize = 5
-        self.maxGridSize = 12
+        # High enough that all 6 curated biomes (progression/lore.py) are
+        # reachable before ascension resets the level back to 1 - at 12,
+        # levels 5-6 ("The Frostbound Coil"/"The Obsidian Spiral") were
+        # silently unreachable dead content.
+        self.maxGridSize = 15
 
         # tick speed
         self.limitTickSpeed = True
