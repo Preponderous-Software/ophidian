@@ -28,8 +28,11 @@ class Config:
         self.maxGridSize = 15
 
         # tick speed
+        # 0.15s/tick (rather than the earlier 0.1s) gives players more time
+        # to react - see issue #97, "the game runs too quickly to react in
+        # time to control the snake effectively."
         self.limitTickSpeed = True
-        self.tickSpeed = 0.1
+        self.tickSpeed = 0.15
 
         # misc
         self.debug = False
