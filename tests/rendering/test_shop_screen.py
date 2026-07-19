@@ -6,14 +6,14 @@ from progression.shop import listUpgrades
 from ui.shop_screen import PygameShopScreen
 
 
-def _makeShopScreen(game):
+def _makeShopScreen(game, onQuit=None):
     return PygameShopScreen(
         game.pygame,
         game.graphik,
         lambda: game.gameDisplay,
         game.config,
         game.saveManager,
-        game.quitApplication,
+        onQuit or game.quitApplication,
     )
 
 
@@ -69,8 +69,9 @@ def test_draw_shows_purchase_confirmation_message(pygameGame):
     assert regionHasNonBackgroundPixel(game.gameDisplay, messageBand, game.config.black)
 
 
-def test_run_navigates_purchases_and_exits_on_escape(pygameGame):
+def test_run_navigates_purchases_and_exits_on_escape(pygameGame, monkeypatch):
     game = pygameGame
+    monkeypatch.setattr(game.pygame.time, "delay", lambda ms: None)
     screen = _makeShopScreen(game)
     upgrades = listUpgrades()
     game.saveManager.data["currency"] = 100
@@ -89,8 +90,9 @@ def test_run_navigates_purchases_and_exits_on_escape(pygameGame):
     assert game.saveManager.data["currency"] == 100 - purchased["cost"]
 
 
-def test_run_does_not_purchase_when_already_owned(pygameGame):
+def test_run_does_not_purchase_when_already_owned(pygameGame, monkeypatch):
     game = pygameGame
+    monkeypatch.setattr(game.pygame.time, "delay", lambda ms: None)
     screen = _makeShopScreen(game)
     upgrades = listUpgrades()
     game.saveManager.data["currency"] = 100
@@ -107,26 +109,20 @@ def test_run_does_not_purchase_when_already_owned(pygameGame):
 
 def test_run_calls_onQuit_on_quit_event(pygameGame):
     game = pygameGame
-    quitCalls = []
+    quitCalled = False
 
     def stubOnQuit():
-        quitCalls.append(True)
+        nonlocal quitCalled
+        quitCalled = True
         # the real onQuit (Ophidian.quitApplication) calls the builtin
         # quit(), which is what actually breaks out of run() for a QUIT
         # event - the loop itself never flips viewingShop to False for it.
         raise SystemExit
 
-    screen = PygameShopScreen(
-        game.pygame,
-        game.graphik,
-        lambda: game.gameDisplay,
-        game.config,
-        game.saveManager,
-        stubOnQuit,
-    )
+    screen = _makeShopScreen(game, onQuit=stubOnQuit)
     pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     with pytest.raises(SystemExit):
         screen.run()
 
-    assert quitCalls == [True]
+    assert quitCalled
