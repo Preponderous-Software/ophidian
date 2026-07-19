@@ -15,6 +15,7 @@ class Config:
         self.white = (255, 255, 255)
         self.green = (0, 255, 0)
         self.red = (255, 0, 0)
+        self.blue = (0, 0, 255)
         self.yellow = (255, 255, 0)
         self.textSize = 50
 
@@ -33,6 +34,13 @@ class Config:
         # time to control the snake effectively."
         self.limitTickSpeed = True
         self.tickSpeed = 0.15
+
+        # food
+        # 80% of spawned food grows the snake; the remainder grants a
+        # temporary speed boost instead (see issue #71).
+        self.growthFoodSpawnRate = 0.8
+        self.speedBoostDuration = 5.0
+        self.speedBoostMultiplier = 2.0
 
         # misc
         self.debug = False
