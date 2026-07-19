@@ -61,6 +61,21 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
     ]
 
 
+def test_text_ui_l_key_toggles_tick_speed_limit(tmp_path, monkeypatch):
+    # regression test: the pygame branch of handleKeyDownEvent has always
+    # let the player toggle config.limitTickSpeed with 'l', but the text UI
+    # branch had no equivalent case at all, even though limitTickSpeed
+    # gates the tick sleep in both UI loops identically (see issue #101)
+    game = _makeGame(monkeypatch, tmp_path)
+    startingValue = game.config.limitTickSpeed
+
+    game.handleKeyDownEvent('l')
+    assert game.config.limitTickSpeed == (not startingValue)
+
+    game.handleKeyDownEvent('l')
+    assert game.config.limitTickSpeed == startingValue
+
+
 def test_spawn_snake_part_prefers_an_empty_neighbor_over_occupied_ones(
     tmp_path, monkeypatch
 ):

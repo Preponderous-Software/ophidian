@@ -271,6 +271,13 @@ class Ophidian:
     def getLocation(self, entity: Entity):
         locationID = entity.getLocationID()
         grid = self.environment.getGrid()
+        # Grid.getLocation() does a raw dict lookup and raises KeyError for
+        # an ID that isn't a real location (e.g. an entity's default -1
+        # sentinel from Entity.__init__ that was never overwritten by
+        # addEntity) - guard so callers get the -1 sentinel they already
+        # check for instead of an unhandled crash (see issue #22).
+        if locationID not in grid.getLocations():
+            return -1
         return grid.getLocation(locationID)
 
     def getLocationAndGrid(self, entity: Entity):
@@ -369,6 +376,7 @@ class Ophidian:
             print("Error: A previous snake part's location was unexpectantly -1.")
             time.sleep(1)
             self.quitApplication()
+            return
 
         targetLocation = snakePart.lastPosition
 
@@ -475,6 +483,11 @@ class Ophidian:
                 ):
                     self.selectedSnakePart.setDirection(3)
                     self.changedDirectionThisTick = True
+            elif key == 'l':
+                if self.config.limitTickSpeed:
+                    self.config.limitTickSpeed = False
+                else:
+                    self.config.limitTickSpeed = True
             elif key == 'r':
                 self.checkForLevelProgressAndReinitialize()
                 return "restart"

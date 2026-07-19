@@ -102,7 +102,7 @@ class TextRenderer:
         """Render control instructions"""
         print(
             "\nControls: w/↑=Up, a/←=Left, s/↓=Down, d/→=Right, "
-            "c=Cycle skin, p=Shop, r=Restart, q=Quit"
+            "c=Cycle skin, p=Shop, l=Toggle tick speed limit, r=Restart, q=Quit"
         )
 
     def enableRawMode(self):
