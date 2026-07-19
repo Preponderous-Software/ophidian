@@ -3,7 +3,7 @@ import time
 from config.config import Config
 from lib.pyenvlib.entity import Entity
 from lib.pyenvlib.environment import Environment
-from food.food import Food
+from food.food import Food, FOOD_TYPE_GROWTH, FOOD_TYPE_SPEED
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
@@ -361,10 +361,14 @@ class Ophidian:
             return
 
         foodColor = food.getColor()
+        foodType = food.getFoodType()
 
         self.removeEntity(food)
         self.spawnFood()
-        self.spawnSnakePart(entity.getTail(), foodColor)
+        if foodType == FOOD_TYPE_SPEED:
+            self.activateSpeedBoost()
+        else:
+            self.spawnSnakePart(entity.getTail(), foodColor)
         self.calculateScore()
 
     def movePreviousSnakePart(self, snakePart):
@@ -611,13 +615,10 @@ class Ophidian:
         self.snakeParts.append(newSnakePart)
 
     def spawnFood(self):
-        food = Food(
-            (
-                random.randrange(50, 200),
-                random.randrange(50, 200),
-                random.randrange(50, 200),
-            )
-        )
+        if random.random() < self.config.growthFoodSpawnRate:
+            food = Food(self.config.red, FOOD_TYPE_GROWTH)
+        else:
+            food = Food(self.config.blue, FOOD_TYPE_SPEED)
 
         # get target location
         targetLocation = -1
@@ -628,6 +629,35 @@ class Ophidian:
                 notFound = False
 
         self.environment.addEntity(food)
+
+    def activateSpeedBoost(self):
+        """Starts (or refreshes) a temporary tick-speed boost from speed food.
+
+        The un-boosted tick speed is captured once, on the first speed food
+        of a boost window, so eating a second speed food while one is
+        already active extends the timer instead of compounding the
+        multiplier.
+        """
+        if not self.speedBoostActive:
+            self.speedBoostBaseTickSpeed = self.config.tickSpeed
+            self.config.tickSpeed = (
+                self.speedBoostBaseTickSpeed / self.config.speedBoostMultiplier
+            )
+        self.speedBoostActive = True
+        self.speedBoostEndTime = time.time() + self.config.speedBoostDuration
+        self.notify("Speed boost!")
+
+    def updateSpeedBoost(self):
+        """Reverts tick speed once an active speed boost's timer expires.
+
+        Called once per tick from both UI loops so the boost is time-based
+        (real seconds) rather than tick-count-based, which would otherwise
+        let limitTickSpeed being toggled off make a boost last forever.
+        """
+        if self.speedBoostActive and time.time() >= self.speedBoostEndTime:
+            self.config.tickSpeed = self.speedBoostBaseTickSpeed
+            self.speedBoostActive = False
+            self.speedBoostEndTime = None
 
     def resolveSelectedCosmeticColor(self):
         # Falls back to the original random-color behavior for "default"
@@ -660,6 +690,11 @@ class Ophidian:
         if "slow_starter" in purchasedUpgrades and self.level == 1:
             effectiveTickSpeed *= 1.25
         self.config.tickSpeed = effectiveTickSpeed
+        # speed food boost: reset on every initialize() (new run/level) so a
+        # boost never carries over into a tick speed the player didn't earn
+        # this life
+        self.speedBoostActive = False
+        self.speedBoostEndTime = None
         # second_wind upgrade: one near-miss available per run, consumed in moveEntity()
         self.secondWindAvailableThisRun = "second_wind" in purchasedUpgrades
         gridSize = computeGridSizeForLevel(
@@ -701,6 +736,8 @@ class Ophidian:
     def runTextUI(self):
         """Run the game with text-based UI"""
         while self.running:
+            self.updateSpeedBoost()
+
             # Check for key press (non-blocking)
             key = self.textRenderer.getKeyPress(timeout=0)
             if key:
@@ -744,6 +781,8 @@ class Ophidian:
     def runPygameUI(self):
         """Run the game with pygame graphical UI"""
         while self.running:
+            self.updateSpeedBoost()
+
             for event in self.pygame.event.get():
                 if event.type == self.pygame.QUIT:
                     self.quitApplication()

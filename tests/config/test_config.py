@@ -10,3 +10,8 @@ def test_tick_speed_defaults_to_a_positive_limited_value():
     config = Config()
     assert config.limitTickSpeed is True
     assert config.tickSpeed > 0
+
+
+def test_growth_food_spawn_rate_is_a_valid_probability():
+    config = Config()
+    assert 0 < config.growthFoodSpawnRate < 1
