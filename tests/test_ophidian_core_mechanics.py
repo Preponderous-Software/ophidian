@@ -47,7 +47,7 @@ def test_get_color_of_location_returns_white_for_an_empty_location(
     tmp_path, monkeypatch
 ):
     game = _makeGame(monkeypatch, tmp_path)
-    grid, centerLocation = _centerLocation(game)
+    _, centerLocation = _centerLocation(game)
     for entityId in list(centerLocation.getEntities().keys()):
         centerLocation.removeEntity(centerLocation.getEntity(entityId))
 
@@ -56,7 +56,7 @@ def test_get_color_of_location_returns_white_for_an_empty_location(
 
 def test_get_color_of_location_returns_the_top_entitys_color(tmp_path, monkeypatch):
     game = _makeGame(monkeypatch, tmp_path)
-    grid, centerLocation = _moveHeadToCenter(game)
+    _, centerLocation = _moveHeadToCenter(game)
     game.selectedSnakePart.setColor((1, 2, 3))
 
     assert game.getColorOfLocation(centerLocation) == (1, 2, 3)
