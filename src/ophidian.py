@@ -203,8 +203,10 @@ class Ophidian:
         The queue is needed in text mode too: a bare print() is wiped by
         TextRenderer.renderGrid()'s clearScreen() later in the very same
         tick, so every notification was previously invisible there (see
-        issue #110). Gameplay code only ever calls notify(); each renderer
-        decides how to show the queued message."""
+        issue #110). In text mode the console copy therefore only survives
+        in redirected/piped output - the banner is what the player sees.
+        Gameplay code only ever calls notify(); each renderer decides how
+        to show the queued message."""
         print(message)
         self.uiBanner.push(message)
 
@@ -633,9 +635,9 @@ class Ophidian:
         # forever once the snake has filled the grid.
         grid = self.environment.getGrid()
         emptyLocations = [
-            grid.getLocation(locationId)
-            for locationId in grid.getLocations()
-            if grid.getLocation(locationId).getNumEntities() == 0
+            location
+            for location in grid.getLocations().values()
+            if location.getNumEntities() == 0
         ]
         if emptyLocations:
             self.environment.addEntityToLocation(food, random.choice(emptyLocations))
