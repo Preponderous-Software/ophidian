@@ -35,13 +35,49 @@ def test_cycle_selected_cosmetic_wraps_and_updates_color_each_time(tmp_path, mon
     assert game.selectedSnakePart.getColor() != SKINS_BY_ID["frost"]["color"]
 
 
-def test_notify_is_console_only_in_text_ui_mode(tmp_path, monkeypatch):
+def test_notify_queues_the_message_in_text_ui_mode(tmp_path, monkeypatch):
+    # regression test: notify() used to only print in text mode, and
+    # TextRenderer.renderGrid()'s clearScreen() wipes that print later in
+    # the same tick - so speed boosts, second_wind saves, unlocks and biome
+    # arrivals were all invisible to text-UI players (see issue #110)
     game = _makeGame(monkeypatch, tmp_path)
+    game.uiBanner.queue.clear()
 
     game.notify("hello")
 
-    # text UI has no pygame banner queue to populate
-    assert game.uiBanner.queue == []
+    assert list(game.uiBanner.queue) == ["hello"]
+
+
+def test_text_ui_loop_renders_the_queued_message(tmp_path, monkeypatch):
+    # the loop itself must hand the banner's current message to the
+    # renderer - queuing it in notify() alone would still leave text-UI
+    # players with nothing on screen
+    game = _makeGame(monkeypatch, tmp_path)
+    game.uiBanner.queue.clear()
+    game.uiBanner.expiresAt = None
+
+    rendered = []
+    monkeypatch.setattr(TextRenderer, "renderGrid", lambda self, *args: None)
+    monkeypatch.setattr(TextRenderer, "renderStats", lambda self, *args: None)
+    monkeypatch.setattr(TextRenderer, "renderHud", lambda self, *args: None)
+    monkeypatch.setattr(TextRenderer, "renderControls", lambda self: None)
+    monkeypatch.setattr(TextRenderer, "getKeyPress", lambda self, timeout=0: None)
+    monkeypatch.setattr(
+        TextRenderer, "renderMessage", lambda self, message: rendered.append(message)
+    )
+    monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
+    # one iteration only, and no real sleep between ticks
+    game.config.limitTickSpeed = False
+    monkeypatch.setattr(
+        Ophidian,
+        "moveEntity",
+        lambda self, entity, direction: setattr(self, "running", False),
+    )
+
+    game.notify("Speed boost!")
+    game.runTextUI()
+
+    assert rendered == ["Speed boost!"]
 
 
 def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
@@ -51,6 +87,8 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
     # drawn - a single-slot uiMessage would silently lose the first message
     game = _makeGame(monkeypatch, tmp_path)
     game.config.useTextUI = False  # pretend pygame mode without a real display
+    # __init__ already queued a "<name> enters <biome>" notify()
+    game.uiBanner.queue.clear()
 
     game.notify("The ophidian ascends! (Ascension 1)")
     game.notify("Medusa enters The Sunken Grove.")
