@@ -197,12 +197,16 @@ class Ophidian:
         print("-----")
 
     def notify(self, message):
-        """Player-facing feedback: always printed to console (which is the
-        whole UI in text mode) and, in pygame mode, also queued on
-        self.uiBanner so it isn't invisible behind the graphical window."""
+        """Player-facing feedback: printed to console and queued on
+        self.uiBanner, which both UI loops render from.
+
+        The queue is needed in text mode too: a bare print() is wiped by
+        TextRenderer.renderGrid()'s clearScreen() later in the very same
+        tick, so every notification was previously invisible there (see
+        issue #110). Gameplay code only ever calls notify(); each renderer
+        decides how to show the queued message."""
         print(message)
-        if not self.config.useTextUI:
-            self.uiBanner.push(message)
+        self.uiBanner.push(message)
 
     def drawUiMessage(self):
         if self.config.useTextUI:
@@ -620,15 +624,25 @@ class Ophidian:
         else:
             food = Food(self.config.blue, FOOD_TYPE_SPEED)
 
-        # get target location
-        targetLocation = -1
-        notFound = True
-        while notFound:
-            targetLocation = self.environment.getGrid().getRandomLocation()
-            if targetLocation.getNumEntities() == 0:
-                notFound = False
-
-        self.environment.addEntity(food)
+        # food must land on an empty location: moveEntity() checks the
+        # destination for a SnakePart before it ever looks for food, so food
+        # spawned underneath a segment isn't just hidden - it's a cell that
+        # kills the player instead of feeding them (see issue #109).
+        # Choosing from the set of empty locations, rather than redrawing
+        # random locations until one happens to be empty, also can't spin
+        # forever once the snake has filled the grid.
+        grid = self.environment.getGrid()
+        emptyLocations = [
+            grid.getLocation(locationId)
+            for locationId in grid.getLocations()
+            if grid.getLocation(locationId).getNumEntities() == 0
+        ]
+        if emptyLocations:
+            self.environment.addEntityToLocation(food, random.choice(emptyLocations))
+        else:
+            # every cell is occupied - there is no legal spot left, but the
+            # board should still have food on it for when one frees up
+            self.environment.addEntity(food)
 
     def activateSpeedBoost(self):
         """Starts (or refreshes) a temporary tick-speed boost from speed food.
@@ -762,6 +776,10 @@ class Ophidian:
             self.textRenderer.renderGrid(
                 self.environment, self.snakeParts, self.collision
             )
+            # uiBanner.current() advances/expires the queue and must be
+            # called exactly once per frame, mirroring UiBanner.draw() in
+            # the pygame loop
+            self.textRenderer.renderMessage(self.uiBanner.current())
             self.textRenderer.renderStats(
                 self.level, len(self.snakeParts), self.score, percentage
             )

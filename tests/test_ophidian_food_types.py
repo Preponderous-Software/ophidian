@@ -2,6 +2,7 @@ from textui.textrenderer import TextRenderer
 
 from food.food import Food, FOOD_TYPE_GROWTH, FOOD_TYPE_SPEED
 from ophidian import Ophidian
+from snake.snakePart import SnakePart
 
 
 def _makeGame(monkeypatch, tmp_path):
@@ -99,6 +100,83 @@ def test_activating_speed_boost_twice_refreshes_timer_without_compounding(
 
     assert game.config.tickSpeed == baseTickSpeed / game.config.speedBoostMultiplier
     assert game.speedBoostEndTime >= firstEndTime
+
+
+def _foodLocations(game):
+    grid = game.environment.getGrid()
+    return [
+        grid.getLocation(locationId)
+        for locationId in grid.getLocations()
+        if any(
+            isinstance(entity, Food)
+            for entity in grid.getLocation(locationId).getEntities().values()
+        )
+    ]
+
+
+def test_spawn_food_lands_on_the_only_empty_location(tmp_path, monkeypatch):
+    # regression test: spawnFood() searched for an empty location and then
+    # discarded it, handing placement to Environment.addEntity()'s
+    # independent random draw - so food routinely landed under a snake
+    # part, on a cell that kills the player instead of feeding them
+    # (see issue #109)
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearFoodFromGrid(game)
+    grid = game.environment.getGrid()
+
+    headLocation = game.getLocation(game.selectedSnakePart)
+    emptyLocation = None
+    for locationId in grid.getLocations():
+        location = grid.getLocation(locationId)
+        if location is headLocation:
+            continue
+        if emptyLocation is None:
+            emptyLocation = location
+            continue
+        game.environment.addEntityToLocation(SnakePart((0, 0, 0)), location)
+
+    game.spawnFood()
+
+    assert _foodLocations(game) == [emptyLocation]
+
+
+def test_spawn_food_never_lands_on_an_occupied_location(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    grid = game.environment.getGrid()
+
+    # leave a handful of empty cells so placement is still random, but
+    # heavily weighted toward collisions if occupancy were ignored
+    emptyBudget = 3
+    for locationId in grid.getLocations():
+        location = grid.getLocation(locationId)
+        if location.getNumEntities() > 0:
+            continue
+        if emptyBudget > 0:
+            emptyBudget -= 1
+            continue
+        game.environment.addEntityToLocation(SnakePart((0, 0, 0)), location)
+
+    for _ in range(20):
+        _clearFoodFromGrid(game)
+        game.spawnFood()
+        for location in _foodLocations(game):
+            assert location.getNumEntities() == 1
+
+
+def test_spawn_food_still_places_food_when_the_grid_is_full(tmp_path, monkeypatch):
+    # a completely full grid has no legal cell left; spawnFood() must fall
+    # back rather than hang searching for one
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearFoodFromGrid(game)
+    grid = game.environment.getGrid()
+    for locationId in grid.getLocations():
+        location = grid.getLocation(locationId)
+        if location.getNumEntities() == 0:
+            game.environment.addEntityToLocation(SnakePart((0, 0, 0)), location)
+
+    game.spawnFood()
+
+    assert len(_foodLocations(game)) == 1
 
 
 def test_spawn_food_can_produce_both_growth_and_speed_types(tmp_path, monkeypatch):

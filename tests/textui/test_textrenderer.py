@@ -67,6 +67,19 @@ def test_render_stats_shows_level_length_score_and_progress(renderer, capsys):
     assert "█" * 15 + "░" * 15 in out
 
 
+def test_render_message_prints_the_current_notification(renderer, capsys):
+    renderer.renderMessage("Speed boost!")
+
+    assert "Speed boost!" in capsys.readouterr().out
+
+
+def test_render_message_prints_nothing_when_there_is_no_message(renderer, capsys):
+    renderer.renderMessage(None)
+    renderer.renderMessage("")
+
+    assert capsys.readouterr().out == ""
+
+
 def test_render_hud_shows_currency_and_active_upgrades(renderer, capsys):
     renderer.renderHud(currency=42, activeUpgradeLabels=["Head Start", "Extra Life"])
 

@@ -77,6 +77,17 @@ class TextRenderer:
         
         print("\nLegend: H=Head, S=Snake, F=Food, .=Empty")
 
+    def renderMessage(self, message):
+        """Render the current player-facing notification, if any.
+
+        The text-mode counterpart of the pygame UiBanner: it receives an
+        already-resolved string, so this renderer stays independent of the
+        graphical UI package.
+        """
+        if not message:
+            return
+        print(f"\n>>> {message}")
+
     def renderStats(self, level, snakeLength, score, percentage):
         """Render game statistics"""
         print(f"\nLevel: {level}")
