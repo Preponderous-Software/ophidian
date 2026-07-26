@@ -164,6 +164,21 @@ class Ophidian:
                 self.level += 1
         self.initialize()
 
+    def restartRun(self):
+        """Ends the current run on the player's 'r' key.
+
+        The run is recorded first, so restarting banks its currency,
+        obituary and lifetime stats exactly like dying or quitting does -
+        previously 'r' jumped straight to reinitializing and silently threw
+        all of that away (see issue #113).
+
+        Recording lives here rather than inside
+        checkForLevelProgressAndReinitialize because the collision path
+        calls that method too, and has already recorded the run by then.
+        """
+        self.recordCurrentRun("restart")
+        self.checkForLevelProgressAndReinitialize()
+
     def recordCurrentRun(self, causeOfDeath):
         # bank currency earned this run before folding it into lifetime stats;
         # recordRun() below calls saveManager.save() which persists both
@@ -499,7 +514,7 @@ class Ophidian:
                 else:
                     self.config.limitTickSpeed = True
             elif key == 'r':
-                self.checkForLevelProgressAndReinitialize()
+                self.restartRun()
                 return "restart"
             elif key == 'c':
                 self.cycleSelectedCosmetic()
@@ -550,7 +565,7 @@ class Ophidian:
                 else:
                     self.config.limitTickSpeed = True
             elif key == self.pygame.K_r:
-                self.checkForLevelProgressAndReinitialize()
+                self.restartRun()
                 return "restart"
             elif key == self.pygame.K_c:
                 self.cycleSelectedCosmetic()
@@ -743,6 +758,23 @@ class Ophidian:
                 tail = self.selectedSnakePart.getTail()
                 self.spawnSnakePart(tail, tail.getColor())
 
+    def endOfTick(self):
+        """Closes out one movement step, for both UI loops.
+
+        Only the sleep is gated on limitTickSpeed - one loop iteration is
+        exactly one moveEntity call either way, so the tick counter and the
+        per-tick direction latch have to advance every iteration. Gating
+        those on limitTickSpeed too meant that pressing 'l' left
+        changedDirectionThisTick permanently True after the first turn (it
+        is reset nowhere else, not even in initialize()), locking the snake
+        into one direction, and froze self.tick so runs recorded a stale
+        ticksSurvived (see issue #112).
+        """
+        if self.config.limitTickSpeed:
+            time.sleep(self.config.tickSpeed)
+        self.tick += 1
+        self.changedDirectionThisTick = False
+
     def run(self):
         if self.config.useTextUI:
             self.runTextUI()
@@ -791,10 +823,7 @@ class Ophidian:
             )
             self.textRenderer.renderControls()
 
-            if self.config.limitTickSpeed:
-                time.sleep(self.config.tickSpeed)
-                self.tick += 1
-                self.changedDirectionThisTick = False
+            self.endOfTick()
 
         self.quitApplication()
 
@@ -851,10 +880,7 @@ class Ophidian:
             self.drawUiMessage()
             self.pygame.display.update()
 
-            if self.config.limitTickSpeed:
-                time.sleep(self.config.tickSpeed)
-                self.tick += 1
-                self.changedDirectionThisTick = False
+            self.endOfTick()
 
         self.quitApplication()
 

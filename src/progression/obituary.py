@@ -14,6 +14,7 @@ silent reset.
 CAUSE_OF_DEATH_PHRASES = {
     "collision": "colliding with itself",
     "quit": "the player's own hand",
+    "restart": "a deliberate restart",
 }
 
 
