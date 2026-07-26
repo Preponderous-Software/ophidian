@@ -95,6 +95,19 @@ def test_pygame_r_key_reinitializes_level_and_signals_restart(pygameGame, monkey
     assert result == "restart"
 
 
+def test_pygame_r_key_records_the_run_before_restarting(pygameGame):
+    # regression test: the pygame branch of 'r' discarded the run's
+    # obituary, currency and lifetime stats along with the text UI's (see
+    # issue #113)
+    game = pygameGame
+    runsBefore = game.saveManager.data["lifetimeStats"]["totalRuns"]
+
+    game.handleKeyDownEvent(pygame.K_r)
+
+    assert game.saveManager.data["lifetimeStats"]["totalRuns"] == runsBefore + 1
+    assert game.saveManager.data["obituaries"][-1]["causeOfDeath"] == "restart"
+
+
 def test_pygame_c_key_cycles_selected_cosmetic(pygameGame, monkeypatch):
     game = pygameGame
     calls = []

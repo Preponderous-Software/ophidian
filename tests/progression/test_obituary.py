@@ -41,6 +41,10 @@ def test_cause_of_death_phrase_quit():
     assert causeOfDeathPhrase("quit") == "the player's own hand"
 
 
+def test_cause_of_death_phrase_restart():
+    assert causeOfDeathPhrase("restart") == "a deliberate restart"
+
+
 def test_cause_of_death_phrase_unknown_code_falls_back_to_raw_code():
     assert causeOfDeathPhrase("something-new") == "something-new"
 
@@ -65,6 +69,12 @@ def test_format_obituary_lines_interpolates_fields_for_quit():
     lines = formatObituaryLines(sampleObituary(causeOfDeath="quit"))
     narrative = lines[1]
     assert "the player's own hand" in narrative
+
+
+def test_format_obituary_lines_interpolates_fields_for_restart():
+    lines = formatObituaryLines(sampleObituary(causeOfDeath="restart"))
+    narrative = lines[1]
+    assert "a deliberate restart" in narrative
 
 
 def test_format_obituary_lines_falls_back_when_name_missing():
