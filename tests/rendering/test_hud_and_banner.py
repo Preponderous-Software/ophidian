@@ -56,3 +56,52 @@ def test_draw_hud_omits_upgrades_line_when_none_owned(pygameGame):
     assert regionHasNonBackgroundPixel(surface, (0, 35, width, 15), game.config.white)
     # ...but the upgrades line is skipped entirely when nothing is owned
     assert not regionHasNonBackgroundPixel(surface, (0, 55, width, 15), game.config.white)
+
+
+def test_draw_hud_renders_speed_boost_line_while_a_boost_is_active(pygameGame):
+    # the "Speed boost!" banner expires well before the boost itself does,
+    # so the HUD has to carry the remainder (issue #114)
+    game = pygameGame
+    game.saveManager.data["purchasedUpgrades"] = ["head_start"]
+    game.activateSpeedBoost()
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+
+    game.drawHud()
+
+    width, _ = surface.get_size()
+    # third line, below the upgrades line this run does own
+    assert regionHasNonBackgroundPixel(surface, (0, 73, width, 15), game.config.white)
+
+
+def test_draw_hud_moves_speed_boost_line_up_when_no_upgrades_are_owned(pygameGame):
+    game = pygameGame
+    game.saveManager.data["purchasedUpgrades"] = []
+    game.secondWindAvailableThisRun = False
+    game.activateSpeedBoost()
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+
+    game.drawHud()
+
+    width, _ = surface.get_size()
+    # takes the (now free) second line rather than leaving a blank row
+    assert regionHasNonBackgroundPixel(surface, (0, 55, width, 15), game.config.white)
+    assert not regionHasNonBackgroundPixel(
+        surface, (0, 73, width, 15), game.config.white
+    )
+
+
+def test_draw_hud_omits_speed_boost_line_when_no_boost_is_running(pygameGame):
+    game = pygameGame
+    game.saveManager.data["purchasedUpgrades"] = []
+    game.secondWindAvailableThisRun = False
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+
+    game.drawHud()
+
+    width, _ = surface.get_size()
+    assert not regionHasNonBackgroundPixel(
+        surface, (0, 55, width, 15), game.config.white
+    )

@@ -111,6 +111,43 @@ def test_text_ui_loop_runs_end_of_tick_without_the_tick_limit(tmp_path, monkeypa
     assert game.changedDirectionThisTick is False
 
 
+def test_text_ui_restart_frame_renders_the_new_board_before_advancing_it(
+    tmp_path, monkeypatch
+):
+    # the "restart" sentinel means exactly one thing in both loops: skip
+    # this iteration's movement step, so the freshly initialized board is
+    # presented before the snake takes its first step (issue #117). The
+    # pygame counterpart lives in tests/rendering/test_pygame_run_loop.py.
+    game = _makeGame(monkeypatch, tmp_path)
+    _silenceTextRenderer(monkeypatch)
+    monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
+
+    keys = ["r"]
+    monkeypatch.setattr(
+        TextRenderer,
+        "getKeyPress",
+        lambda self, timeout=0: keys.pop(0) if keys else None,
+    )
+    renders = []
+    monkeypatch.setattr(
+        TextRenderer, "renderGrid", lambda self, *args: renders.append(1)
+    )
+    moves = []
+
+    def recordMoveAndStop(self, entity, direction):
+        moves.append(direction)
+        self.running = False
+
+    monkeypatch.setattr(Ophidian, "moveEntity", recordMoveAndStop)
+
+    game.runTextUI()
+
+    # two full frames: the restart frame renders but does not move, the
+    # frame after it moves as usual
+    assert len(renders) == 2
+    assert len(moves) == 1
+
+
 def test_restart_records_the_run_with_a_restart_cause_of_death(tmp_path, monkeypatch):
     # regression test: 'r' used to jump straight to
     # checkForLevelProgressAndReinitialize, discarding the run's obituary,

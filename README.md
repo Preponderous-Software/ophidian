@@ -1,6 +1,23 @@
 # Ophidian
 This game allows you to control an ever-increasingly growing ophidian in a virtual environment. 
 
+## Requirements
+- Python 3.8 or newer
+- [pygame](https://www.pygame.org/) — only for the graphical UI; `--text-ui` runs without it
+
+## Installation
+```bash
+git clone https://github.com/Preponderous-Software/ophidian.git
+cd ophidian
+pip install -r requirements.txt
+```
+
+To run the tests or the formatter, install the development dependencies
+(`pytest`, `pytest-cov`, `black`, `autoflake`) instead:
+```bash
+pip install -r requirements-dev.txt
+```
+
 ## Usage
 
 ### Graphical UI (Default)

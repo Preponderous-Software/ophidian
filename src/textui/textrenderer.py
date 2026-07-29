@@ -1,3 +1,4 @@
+import math
 import os
 import sys
 import termios
@@ -101,13 +102,21 @@ class TextRenderer:
         bar = '█' * filled + '░' * (bar_length - filled)
         print(f"[{bar}]")
 
-    def renderHud(self, currency, activeUpgradeLabels):
-        """Currency + active-upgrades readout, always visible (not just
-        inside the shop) so the player isn't stuck checking their balance or
-        what they own by reopening the shop mid-run."""
+    def renderHud(self, currency, activeUpgradeLabels, speedBoostSecondsRemaining=None):
+        """Currency, active-upgrades and speed-boost readout, always visible
+        (not just inside the shop) so the player isn't stuck checking their
+        balance or what they own by reopening the shop mid-run.
+
+        speedBoostSecondsRemaining arrives as a plain number (None when no
+        boost is running) and is formatted here, mirroring renderMessage's
+        already-resolved string so this renderer stays independent of the
+        graphical UI package.
+        """
         print(f"Currency: {currency}")
         if activeUpgradeLabels:
             print("Active upgrades: " + ", ".join(activeUpgradeLabels))
+        if speedBoostSecondsRemaining:
+            print(f"Speed boost: {math.ceil(speedBoostSecondsRemaining)}s")
 
     def renderControls(self):
         """Render control instructions"""
