@@ -96,6 +96,30 @@ def test_render_hud_omits_upgrades_line_when_none_active(renderer, capsys):
     assert "Active upgrades" not in out
 
 
+def test_render_hud_shows_remaining_speed_boost_rounded_up(renderer, capsys):
+    renderer.renderHud(
+        currency=0, activeUpgradeLabels=[], speedBoostSecondsRemaining=2.4
+    )
+
+    assert "Speed boost: 3s" in capsys.readouterr().out
+
+
+def test_render_hud_omits_speed_boost_line_when_no_boost_is_running(renderer, capsys):
+    renderer.renderHud(currency=0, activeUpgradeLabels=[])
+
+    assert "Speed boost" not in capsys.readouterr().out
+
+
+def test_render_hud_omits_speed_boost_line_for_a_boost_with_no_time_left(
+    renderer, capsys
+):
+    # a boost whose timer has run out is readable for the one frame before
+    # updateSpeedBoost() clears it - don't advertise "Speed boost: 0s"
+    renderer.renderHud(currency=0, activeUpgradeLabels=[], speedBoostSecondsRemaining=0)
+
+    assert "Speed boost" not in capsys.readouterr().out
+
+
 def test_render_controls_lists_key_bindings(renderer, capsys):
     renderer.renderControls()
 

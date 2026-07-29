@@ -102,6 +102,39 @@ def test_activating_speed_boost_twice_refreshes_timer_without_compounding(
     assert game.speedBoostEndTime >= firstEndTime
 
 
+def test_speed_boost_remaining_seconds_is_none_when_no_boost_is_running(
+    tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path)
+
+    assert game.getSpeedBoostRemainingSeconds() is None
+
+
+def test_speed_boost_remaining_seconds_counts_down_while_active(tmp_path, monkeypatch):
+    # the "Speed boost!" banner expires after 2s while the boost lasts 5s,
+    # so both HUDs need the remaining time to keep showing it (issue #114)
+    game = _makeGame(monkeypatch, tmp_path)
+
+    game.activateSpeedBoost()
+    endTime = game.speedBoostEndTime
+    monkeypatch.setattr("ophidian.time.time", lambda: endTime - 3)
+
+    assert game.getSpeedBoostRemainingSeconds() == 3
+
+
+def test_speed_boost_remaining_seconds_never_goes_negative(tmp_path, monkeypatch):
+    # updateSpeedBoost() clears the boost on the next tick, so an expired
+    # boost can still be read for one frame - report 0 rather than a
+    # negative countdown
+    game = _makeGame(monkeypatch, tmp_path)
+
+    game.activateSpeedBoost()
+    endTime = game.speedBoostEndTime
+    monkeypatch.setattr("ophidian.time.time", lambda: endTime + 5)
+
+    assert game.getSpeedBoostRemainingSeconds() == 0
+
+
 def _foodLocations(game):
     grid = game.environment.getGrid()
     return [

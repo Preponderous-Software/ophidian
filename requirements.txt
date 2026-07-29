@@ -1,0 +1,4 @@
+# Runtime dependencies.
+# Not needed for the text-based UI (`python src/ophidian.py --text-ui`),
+# which imports TextRenderer instead of pygame.
+pygame>=2.0.0

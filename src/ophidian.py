@@ -1,3 +1,4 @@
+import math
 import random
 import time
 from config.config import Config
@@ -237,10 +238,15 @@ class Ophidian:
         )
 
     def drawHud(self):
-        """Currency + active-upgrades readout, always visible (not just
-        inside the shop) so the player isn't stuck checking their balance or
-        what they own by reopening the shop mid-run. Drawn just below the
-        banner strip so the two never overlap."""
+        """Currency, active-upgrades and speed-boost readout, always visible
+        (not just inside the shop) so the player isn't stuck checking their
+        balance or what they own by reopening the shop mid-run. Drawn just
+        below the banner strip so the two never overlap.
+
+        The optional lines flow upwards into whatever space the ones above
+        them left free, so an unowned-upgrades run doesn't render the boost
+        line with a blank row above it.
+        """
         if self.config.useTextUI:
             return
         width, _ = self.gameDisplay.get_size()
@@ -248,10 +254,26 @@ class Ophidian:
         self.graphik.drawText(
             f"Currency: {currency}", width // 2, 45, 14, self.config.black
         )
+        lineY = 63
         labels = self.getActiveUpgradesSummary()
         if labels:
             self.graphik.drawText(
-                " | ".join(labels), width // 2, 63, 12, self.config.black
+                " | ".join(labels), width // 2, lineY, 12, self.config.black
+            )
+            lineY += 18
+        secondsRemaining = self.getSpeedBoostRemainingSeconds()
+        # None is "no boost"; 0 is a boost whose timer has run out but which
+        # updateSpeedBoost() only clears on the next tick - neither is worth
+        # a line. The remainder is formatted here rather than by gameplay
+        # code, so the accessor stays a plain number both renderers can
+        # present their own way.
+        if secondsRemaining is not None and secondsRemaining > 0:
+            self.graphik.drawText(
+                f"Speed boost: {math.ceil(secondsRemaining)}s",
+                width // 2,
+                lineY,
+                12,
+                self.config.black,
             )
 
     def renderObituaryScreen(self):
@@ -690,6 +712,24 @@ class Ophidian:
             self.speedBoostActive = False
             self.speedBoostEndTime = None
 
+    def getSpeedBoostRemainingSeconds(self):
+        """Seconds left on the active speed boost, or None when no boost is
+        running.
+
+        The "Speed boost!" banner expires after UiBanner.durationSeconds
+        (2s) while the boost itself lasts config.speedBoostDuration (5s), so
+        without this the snake spent the tail of every boost moving faster
+        for reasons the player could no longer see (see issue #114).
+
+        Returns a plain number rather than a display string so each renderer
+        formats it in its own idiom and gameplay code stays out of the UI.
+        Both loops already call updateSpeedBoost() once per iteration, so
+        the value is naturally fresh with no extra bookkeeping.
+        """
+        if not self.speedBoostActive or self.speedBoostEndTime is None:
+            return None
+        return max(0.0, self.speedBoostEndTime - time.time())
+
     def resolveSelectedCosmeticColor(self):
         # Falls back to the original random-color behavior for "default"
         # or any unresolvable/unknown cosmetic id.
@@ -775,6 +815,16 @@ class Ophidian:
         self.tick += 1
         self.changedDirectionThisTick = False
 
+    def moveSelectedSnakePart(self):
+        """The one movement step of a tick, shared by both UI loops.
+
+        Kept in one place (rather than duplicated as a direction if/elif
+        chain per loop) so the graphical and text UIs cannot drift apart on
+        what a tick does - the recurring problem behind PRs #92, #95 and
+        #99.
+        """
+        self.moveEntity(self.selectedSnakePart, self.selectedSnakePart.getDirection())
+
     def run(self):
         if self.config.useTextUI:
             self.runTextUI()
@@ -787,21 +837,16 @@ class Ophidian:
             self.updateSpeedBoost()
 
             # Check for key press (non-blocking)
+            restarted = False
             key = self.textRenderer.getKeyPress(timeout=0)
             if key:
-                result = self.handleKeyDownEvent(key)
-                if result == "restart":
-                    continue
+                restarted = self.handleKeyDownEvent(key) == "restart"
 
-            # Move snake based on direction
-            if self.selectedSnakePart.getDirection() == 0:
-                self.moveEntity(self.selectedSnakePart, 0)
-            elif self.selectedSnakePart.getDirection() == 1:
-                self.moveEntity(self.selectedSnakePart, 1)
-            elif self.selectedSnakePart.getDirection() == 2:
-                self.moveEntity(self.selectedSnakePart, 2)
-            elif self.selectedSnakePart.getDirection() == 3:
-                self.moveEntity(self.selectedSnakePart, 3)
+            # Move snake based on direction. Skipped on a restart frame so
+            # the freshly initialized board is presented before it advances
+            # - see runPygameUI, which must agree (issue #117).
+            if not restarted:
+                self.moveSelectedSnakePart()
 
             # Render the game state
             percentage = len(self.snakeParts) / len(
@@ -820,6 +865,7 @@ class Ophidian:
             self.textRenderer.renderHud(
                 self.saveManager.data.get("currency", 0),
                 self.getActiveUpgradesSummary(),
+                self.getSpeedBoostRemainingSeconds(),
             )
             self.textRenderer.renderControls()
 
@@ -832,24 +878,24 @@ class Ophidian:
         while self.running:
             self.updateSpeedBoost()
 
+            # tracked across the whole event drain rather than acted on
+            # inside it: `continue` in the for loop only advanced to the
+            # next event, which left the graphical UI moving the snake in
+            # the very frame a run restarted while the text UI did not
+            # (issue #117). The drain still finishes either way, so events
+            # queued behind the restart key aren't silently dropped.
+            restarted = False
             for event in self.pygame.event.get():
                 if event.type == self.pygame.QUIT:
                     self.quitApplication()
                 elif event.type == self.pygame.KEYDOWN:
-                    result = self.handleKeyDownEvent(event.key)
-                    if result == "restart":
-                        continue
+                    if self.handleKeyDownEvent(event.key) == "restart":
+                        restarted = True
                 elif event.type == self.pygame.WINDOWRESIZED:
                     self.initializeLocationWidthAndHeight()
 
-            if self.selectedSnakePart.getDirection() == 0:
-                self.moveEntity(self.selectedSnakePart, 0)
-            elif self.selectedSnakePart.getDirection() == 1:
-                self.moveEntity(self.selectedSnakePart, 1)
-            elif self.selectedSnakePart.getDirection() == 2:
-                self.moveEntity(self.selectedSnakePart, 2)
-            elif self.selectedSnakePart.getDirection() == 3:
-                self.moveEntity(self.selectedSnakePart, 3)
+            if not restarted:
+                self.moveSelectedSnakePart()
 
             self.gameDisplay.fill(self.config.white)
             self.drawEnvironment()
