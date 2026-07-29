@@ -107,15 +107,16 @@ class TextRenderer:
         (not just inside the shop) so the player isn't stuck checking their
         balance or what they own by reopening the shop mid-run.
 
-        speedBoostSecondsRemaining arrives as a plain number (None when no
-        boost is running) and is formatted here, mirroring renderMessage's
-        already-resolved string so this renderer stays independent of the
-        graphical UI package.
+        speedBoostSecondsRemaining arrives as a plain number and is
+        formatted here, mirroring renderMessage's already-resolved string so
+        this renderer stays independent of the graphical UI package. None
+        means no boost is running; 0 means one has just run out and is about
+        to be cleared - neither gets a line, matching Ophidian.drawHud().
         """
         print(f"Currency: {currency}")
         if activeUpgradeLabels:
             print("Active upgrades: " + ", ".join(activeUpgradeLabels))
-        if speedBoostSecondsRemaining:
+        if speedBoostSecondsRemaining is not None and speedBoostSecondsRemaining > 0:
             print(f"Speed boost: {math.ceil(speedBoostSecondsRemaining)}s")
 
     def renderControls(self):

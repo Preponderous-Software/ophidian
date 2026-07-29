@@ -262,9 +262,12 @@ class Ophidian:
             )
             lineY += 18
         secondsRemaining = self.getSpeedBoostRemainingSeconds()
-        if secondsRemaining:
-            # formatted here rather than by gameplay code, so the accessor
-            # stays a plain number both renderers can present their own way
+        # None is "no boost"; 0 is a boost whose timer has run out but which
+        # updateSpeedBoost() only clears on the next tick - neither is worth
+        # a line. The remainder is formatted here rather than by gameplay
+        # code, so the accessor stays a plain number both renderers can
+        # present their own way.
+        if secondsRemaining is not None and secondsRemaining > 0:
             self.graphik.drawText(
                 f"Speed boost: {math.ceil(secondsRemaining)}s",
                 width // 2,

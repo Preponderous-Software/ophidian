@@ -1,3 +1,5 @@
+import time
+
 from conftest import regionHasNonBackgroundPixel
 
 
@@ -96,6 +98,25 @@ def test_draw_hud_omits_speed_boost_line_when_no_boost_is_running(pygameGame):
     game = pygameGame
     game.saveManager.data["purchasedUpgrades"] = []
     game.secondWindAvailableThisRun = False
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+
+    game.drawHud()
+
+    width, _ = surface.get_size()
+    assert not regionHasNonBackgroundPixel(
+        surface, (0, 55, width, 15), game.config.white
+    )
+
+
+def test_draw_hud_omits_speed_boost_line_for_a_boost_with_no_time_left(pygameGame):
+    # updateSpeedBoost() only clears an expired boost on the next tick, so
+    # the accessor can report 0 for one frame - don't draw "Speed boost: 0s"
+    game = pygameGame
+    game.saveManager.data["purchasedUpgrades"] = []
+    game.secondWindAvailableThisRun = False
+    game.activateSpeedBoost()
+    game.speedBoostEndTime = time.time() - 1
     surface = game.gameDisplay
     surface.fill(game.config.white)  # matches the real frame's fill-before-draw
 

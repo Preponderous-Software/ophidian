@@ -2,7 +2,7 @@
 This game allows you to control an ever-increasingly growing ophidian in a virtual environment. 
 
 ## Requirements
-- Python 3.8 or newer
+- Python 3.8 or newer (developed and tested on 3.10)
 - [pygame](https://www.pygame.org/) — only for the graphical UI; `--text-ui` runs without it
 
 ## Installation
