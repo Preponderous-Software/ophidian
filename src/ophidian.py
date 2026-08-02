@@ -9,6 +9,8 @@ from powerup.powerup import (
     PowerUp,
     PowerUpType,
     getPowerUpDefinition,
+    getPowerUpDurationSeconds,
+    getPowerUpHudLabel,
     rollPowerUpType,
 )
 from powerup.active import ActivePowerUps
@@ -714,13 +716,12 @@ class Ophidian:
         power-up that is already running extends its timer instead of
         compounding the effect (e.g. halving an already-halved tick speed).
         """
-        definition = getPowerUpDefinition(powerUpType)
         newlyActivated = self.activePowerUps.activate(
-            powerUpType, definition["durationSeconds"]
+            powerUpType, getPowerUpDurationSeconds(powerUpType)
         )
         if newlyActivated:
             self.applyPowerUpEffect(powerUpType)
-        self.notify(definition["activationMessage"])
+        self.notify(getPowerUpDefinition(powerUpType)["activationMessage"])
 
     def applyPowerUpEffect(self, powerUpType):
         """Applies what a power-up actually does to the running game.
@@ -769,7 +770,7 @@ class Ophidian:
         bookkeeping.
         """
         return [
-            (getPowerUpDefinition(powerUpType)["hudLabel"], secondsRemaining)
+            (getPowerUpHudLabel(powerUpType), secondsRemaining)
             for powerUpType, secondsRemaining in self.activePowerUps.statuses()
         ]
 
