@@ -38,6 +38,19 @@ The text-based UI is perfect for:
 - Low-resource systems
 - Terminal enthusiasts
 
+## Pickups
+Most of what spawns on the board is food, which grows the ophidian by one segment.
+The rest are power-ups, which grant a temporary effect instead of growing you:
+
+Power-up | Effect | Duration
+------------ | ------------- | -------------
+Speed Boost | the ophidian moves twice as fast | 5s
+Invincibility | collisions with your own body no longer end the run | 3s
+
+Whatever is currently running is listed on the HUD with its remaining time, in both
+UIs. In the text UI, power-ups appear on the grid as their own symbol and are listed
+in the legend beneath it.
+
 ## Controls
 Key | Action
 ------------ | -------------

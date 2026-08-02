@@ -35,12 +35,13 @@ class Config:
         self.limitTickSpeed = True
         self.tickSpeed = 0.15
 
-        # food
-        # 80% of spawned food grows the snake; the remainder grants a
-        # temporary speed boost instead (see issue #71).
+        # pickups
+        # 80% of spawned pickups are growth food; the remainder are
+        # power-ups (see issue #71). How long each power-up lasts and what
+        # it does lives with its registry entry in powerup/powerup.py,
+        # alongside its spawn weight, the same way progression/shop.py owns
+        # its upgrades' costs and effects.
         self.growthFoodSpawnRate = 0.8
-        self.speedBoostDuration = 5.0
-        self.speedBoostMultiplier = 2.0
 
         # misc
         self.debug = False

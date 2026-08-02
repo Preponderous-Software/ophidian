@@ -134,9 +134,9 @@ def test_spawn_snake_part_prefers_an_empty_neighbor_over_occupied_ones(
     game.environment.removeEntity(game.selectedSnakePart)
     game.environment.addEntityToLocation(game.selectedSnakePart, tailLocation)
 
-    # spawnFood() during initialize() may have placed food on any of these
-    # cells before we moved the head here - clear them all so the occupancy
-    # setup below is deterministic regardless of where food landed
+    # spawnPickup() during initialize() may have placed a pickup on any of
+    # these cells before we moved the head here - clear them all so the
+    # occupancy setup below is deterministic regardless of where it landed
     leftLocation = grid.getLeft(tailLocation)
     for neighbor in (grid.getUp(tailLocation), grid.getDown(tailLocation), grid.getRight(tailLocation), leftLocation):
         for entityId in list(neighbor.getEntities().keys()):

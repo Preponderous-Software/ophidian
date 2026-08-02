@@ -53,16 +53,24 @@ class TextRenderer:
                 hy = headLocation.getY()
                 display[hy][hx] = 'H'
         
-        # Mark food
+        # Mark food and power-ups. A power-up supplies its own symbol and
+        # display name (the way Food already supplies its color), so this
+        # renderer stays independent of the power-up registry and needs no
+        # change when a new power-up type is added.
+        powerUpLegend = {}
         for locationId in grid.getLocations():
             location = grid.getLocation(locationId)
             for eid in location.getEntities():
                 entity = location.getEntity(eid)
+                x = location.getX()
+                y = location.getY()
                 if entity.getName() == "Food":
-                    x = location.getX()
-                    y = location.getY()
                     display[y][x] = 'F'
-        
+                elif entity.getName() == "PowerUp":
+                    symbol = entity.getTextSymbol()
+                    display[y][x] = symbol
+                    powerUpLegend[symbol] = entity.getDisplayName()
+
         # Print border
         print('┌' + '─' * (rows * 2 + 1) + '┐')
         
@@ -76,7 +84,14 @@ class TextRenderer:
         if collision:
             print("\n[!] COLLISION! The ophidian collides with itself!")
         
-        print("\nLegend: H=Head, S=Snake, F=Food, .=Empty")
+        # power-up entries are built from what is actually on the board, so
+        # the legend can never advertise a symbol the player can't see
+        legendEntries = ["H=Head", "S=Snake", "F=Food"]
+        legendEntries += [
+            f"{symbol}={name}" for symbol, name in sorted(powerUpLegend.items())
+        ]
+        legendEntries.append(".=Empty")
+        print("\nLegend: " + ", ".join(legendEntries))
 
     def renderMessage(self, message):
         """Render the current player-facing notification, if any.
@@ -102,22 +117,23 @@ class TextRenderer:
         bar = '█' * filled + '░' * (bar_length - filled)
         print(f"[{bar}]")
 
-    def renderHud(self, currency, activeUpgradeLabels, speedBoostSecondsRemaining=None):
-        """Currency, active-upgrades and speed-boost readout, always visible
-        (not just inside the shop) so the player isn't stuck checking their
-        balance or what they own by reopening the shop mid-run.
+    def renderHud(self, currency, activeUpgradeLabels, powerUpStatuses=None):
+        """Currency, active-upgrades and active-power-up readout, always
+        visible (not just inside the shop) so the player isn't stuck checking
+        their balance or what they own by reopening the shop mid-run.
 
-        speedBoostSecondsRemaining arrives as a plain number and is
-        formatted here, mirroring renderMessage's already-resolved string so
-        this renderer stays independent of the graphical UI package. None
-        means no boost is running; 0 means one has just run out and is about
-        to be cleared - neither gets a line, matching Ophidian.drawHud().
+        powerUpStatuses is a list of (label, secondsRemaining) pairs whose
+        seconds arrive as plain numbers and are formatted here, mirroring
+        renderMessage's already-resolved string so this renderer stays
+        independent of both the graphical UI package and the power-up
+        registry. Gameplay omits power-ups with no time left, so every pair
+        handed over is worth a line.
         """
         print(f"Currency: {currency}")
         if activeUpgradeLabels:
             print("Active upgrades: " + ", ".join(activeUpgradeLabels))
-        if speedBoostSecondsRemaining is not None and speedBoostSecondsRemaining > 0:
-            print(f"Speed boost: {math.ceil(speedBoostSecondsRemaining)}s")
+        for label, secondsRemaining in powerUpStatuses or []:
+            print(f"{label}: {math.ceil(secondsRemaining)}s")
 
     def renderControls(self):
         """Render control instructions"""
