@@ -4,7 +4,14 @@ import time
 from config.config import Config
 from lib.pyenvlib.entity import Entity
 from lib.pyenvlib.environment import Environment
-from food.food import Food, FOOD_TYPE_GROWTH, FOOD_TYPE_SPEED
+from food.food import Food, FOOD_TYPE_GROWTH
+from powerup.powerup import (
+    PowerUp,
+    PowerUpType,
+    getPowerUpDefinition,
+    rollPowerUpType,
+)
+from powerup.active import ActivePowerUps
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
@@ -61,6 +68,10 @@ class Ophidian:
         self.baseTickSpeed = self.config.tickSpeed
         self.ascensionBonus = None
         self.uiBanner = UiBanner()
+        # timers for collected power-ups; must exist before initialize(),
+        # which clears them for the starting run
+        self.activePowerUps = ActivePowerUps()
+        self.tickSpeedBeforeBoost = None
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -238,14 +249,14 @@ class Ophidian:
         )
 
     def drawHud(self):
-        """Currency, active-upgrades and speed-boost readout, always visible
-        (not just inside the shop) so the player isn't stuck checking their
-        balance or what they own by reopening the shop mid-run. Drawn just
-        below the banner strip so the two never overlap.
+        """Currency, active-upgrades and active-power-up readout, always
+        visible (not just inside the shop) so the player isn't stuck checking
+        their balance or what they own by reopening the shop mid-run. Drawn
+        just below the banner strip so the two never overlap.
 
         The optional lines flow upwards into whatever space the ones above
-        them left free, so an unowned-upgrades run doesn't render the boost
-        line with a blank row above it.
+        them left free, so a run with no upgrades owned doesn't render its
+        power-up lines with a blank row above them.
         """
         if self.config.useTextUI:
             return
@@ -261,20 +272,18 @@ class Ophidian:
                 " | ".join(labels), width // 2, lineY, 12, self.config.black
             )
             lineY += 18
-        secondsRemaining = self.getSpeedBoostRemainingSeconds()
-        # None is "no boost"; 0 is a boost whose timer has run out but which
-        # updateSpeedBoost() only clears on the next tick - neither is worth
-        # a line. The remainder is formatted here rather than by gameplay
-        # code, so the accessor stays a plain number both renderers can
-        # present their own way.
-        if secondsRemaining is not None and secondsRemaining > 0:
+        # one line per running power-up. Remaining seconds arrive as plain
+        # numbers and are formatted here, so gameplay stays out of the UI and
+        # each renderer presents them in its own idiom.
+        for label, secondsRemaining in self.getActivePowerUpStatuses():
             self.graphik.drawText(
-                f"Speed boost: {math.ceil(secondsRemaining)}s",
+                f"{label}: {math.ceil(secondsRemaining)}s",
                 width // 2,
                 lineY,
                 12,
                 self.config.black,
             )
+            lineY += 18
 
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
@@ -350,6 +359,15 @@ class Ophidian:
         for eid in newLocation.getEntities():
             e = newLocation.getEntity(eid)
             if type(e) is SnakePart:
+                # invincibility power-up: collisions simply don't land while
+                # it is running. The move is dropped rather than letting the
+                # head share a cell with its own body (which would leave the
+                # snake overlapping itself once the power-up expires) - the
+                # player keeps full steering control, so this stalls for a
+                # tick instead of ending the run. Checked before second_wind
+                # so a power-up never burns the paid-for upgrade.
+                if self.activePowerUps.isActive(PowerUpType.INVINCIBILITY):
+                    return
                 # second_wind upgrade: the first collision each run is
                 # converted into a near-miss instead of ending the run;
                 # only the second collision in the same run actually kills
@@ -393,25 +411,25 @@ class Ophidian:
                 ")",
             )
 
-        food = -1
-        # check for food
+        pickup = None
+        # check for something collectible - food grows the snake, a power-up
+        # grants its timed effect instead
         for eid in newLocation.getEntities():
             e = newLocation.getEntity(eid)
-            if type(e) is Food:
-                food = e
+            if type(e) is Food or type(e) is PowerUp:
+                pickup = e
 
-        if food == -1:
+        if pickup is None:
             return
 
-        foodColor = food.getColor()
-        foodType = food.getFoodType()
+        pickupColor = pickup.getColor()
 
-        self.removeEntity(food)
-        self.spawnFood()
-        if foodType == FOOD_TYPE_SPEED:
-            self.activateSpeedBoost()
+        self.removeEntity(pickup)
+        self.spawnPickup()
+        if type(pickup) is PowerUp:
+            self.activatePowerUp(pickup.getPowerUpType())
         else:
-            self.spawnSnakePart(entity.getTail(), foodColor)
+            self.spawnSnakePart(entity.getTail(), pickupColor)
         self.calculateScore()
 
     def movePreviousSnakePart(self, snakePart):
@@ -657,19 +675,25 @@ class Ophidian:
         self.environment.addEntityToLocation(newSnakePart, targetLocation)
         self.snakeParts.append(newSnakePart)
 
-    def spawnFood(self):
-        if random.random() < self.config.growthFoodSpawnRate:
-            food = Food(self.config.red, FOOD_TYPE_GROWTH)
-        else:
-            food = Food(self.config.blue, FOOD_TYPE_SPEED)
+    def spawnPickup(self):
+        """Spawns the next collectible on the board.
 
-        # food must land on an empty location: moveEntity() checks the
-        # destination for a SnakePart before it ever looks for food, so food
-        # spawned underneath a segment isn't just hidden - it's a cell that
-        # kills the player instead of feeding them (see issue #109).
-        # Choosing from the set of empty locations, rather than redrawing
-        # random locations until one happens to be empty, also can't spin
-        # forever once the snake has filled the grid.
+        config.growthFoodSpawnRate of them are growth food; the rest are
+        power-ups, drawn from the registry by spawn weight (see
+        powerup/powerup.py).
+        """
+        if random.random() < self.config.growthFoodSpawnRate:
+            pickup = Food(self.config.red, FOOD_TYPE_GROWTH)
+        else:
+            pickup = PowerUp(rollPowerUpType())
+
+        # a pickup must land on an empty location: moveEntity() checks the
+        # destination for a SnakePart before it ever looks for something
+        # collectible, so a pickup spawned underneath a segment isn't just
+        # hidden - it's a cell that kills the player instead of rewarding
+        # them (see issue #109). Choosing from the set of empty locations,
+        # rather than redrawing random locations until one happens to be
+        # empty, also can't spin forever once the snake has filled the grid.
         grid = self.environment.getGrid()
         emptyLocations = [
             location
@@ -677,58 +701,77 @@ class Ophidian:
             if location.getNumEntities() == 0
         ]
         if emptyLocations:
-            self.environment.addEntityToLocation(food, random.choice(emptyLocations))
+            self.environment.addEntityToLocation(pickup, random.choice(emptyLocations))
         else:
             # every cell is occupied - there is no legal spot left, but the
-            # board should still have food on it for when one frees up
-            self.environment.addEntity(food)
+            # board should still have something on it for when one frees up
+            self.environment.addEntity(pickup)
 
-    def activateSpeedBoost(self):
-        """Starts (or refreshes) a temporary tick-speed boost from speed food.
+    def activatePowerUp(self, powerUpType):
+        """Starts (or refreshes) a collected power-up.
 
-        The un-boosted tick speed is captured once, on the first speed food
-        of a boost window, so eating a second speed food while one is
-        already active extends the timer instead of compounding the
-        multiplier.
+        The effect is applied only on a fresh activation: collecting a
+        power-up that is already running extends its timer instead of
+        compounding the effect (e.g. halving an already-halved tick speed).
         """
-        if not self.speedBoostActive:
-            self.speedBoostBaseTickSpeed = self.config.tickSpeed
+        definition = getPowerUpDefinition(powerUpType)
+        newlyActivated = self.activePowerUps.activate(
+            powerUpType, definition["durationSeconds"]
+        )
+        if newlyActivated:
+            self.applyPowerUpEffect(powerUpType)
+        self.notify(definition["activationMessage"])
+
+    def applyPowerUpEffect(self, powerUpType):
+        """Applies what a power-up actually does to the running game.
+
+        The one place a new power-up type needs gameplay code; everything
+        else about it (spawning, timing, both HUDs) is driven off the
+        registry. Invincibility has no entry here because it is read
+        directly off activePowerUps in moveEntity().
+        """
+        if powerUpType == PowerUpType.SPEED:
+            definition = getPowerUpDefinition(powerUpType)
+            self.tickSpeedBeforeBoost = self.config.tickSpeed
             self.config.tickSpeed = (
-                self.speedBoostBaseTickSpeed / self.config.speedBoostMultiplier
+                self.tickSpeedBeforeBoost / definition["tickSpeedMultiplier"]
             )
-        self.speedBoostActive = True
-        self.speedBoostEndTime = time.time() + self.config.speedBoostDuration
-        self.notify("Speed boost!")
 
-    def updateSpeedBoost(self):
-        """Reverts tick speed once an active speed boost's timer expires.
+    def revertPowerUpEffect(self, powerUpType):
+        """Undoes applyPowerUpEffect() when a power-up runs out."""
+        if powerUpType == PowerUpType.SPEED and self.tickSpeedBeforeBoost is not None:
+            self.config.tickSpeed = self.tickSpeedBeforeBoost
+            self.tickSpeedBeforeBoost = None
 
-        Called once per tick from both UI loops so the boost is time-based
+    def updatePowerUps(self):
+        """Expires power-ups whose timers have run out, and reverts them.
+
+        Called once per tick from both UI loops so power-ups are time-based
         (real seconds) rather than tick-count-based, which would otherwise
-        let limitTickSpeed being toggled off make a boost last forever.
+        let limitTickSpeed being toggled off make one last forever.
         """
-        if self.speedBoostActive and time.time() >= self.speedBoostEndTime:
-            self.config.tickSpeed = self.speedBoostBaseTickSpeed
-            self.speedBoostActive = False
-            self.speedBoostEndTime = None
+        for powerUpType in self.activePowerUps.expire():
+            self.revertPowerUpEffect(powerUpType)
+            self.notify(getPowerUpDefinition(powerUpType)["expiryMessage"])
 
-    def getSpeedBoostRemainingSeconds(self):
-        """Seconds left on the active speed boost, or None when no boost is
-        running.
+    def getActivePowerUpStatuses(self):
+        """[(label, secondsRemaining)] for every power-up currently running.
 
-        The "Speed boost!" banner expires after UiBanner.durationSeconds
-        (2s) while the boost itself lasts config.speedBoostDuration (5s), so
-        without this the snake spent the tail of every boost moving faster
-        for reasons the player could no longer see (see issue #114).
+        A power-up's activation banner expires after UiBanner.durationSeconds
+        (2s) while the power-up itself can last longer, so without this the
+        snake spent the tail of every boost moving faster for reasons the
+        player could no longer see (see issue #114).
 
-        Returns a plain number rather than a display string so each renderer
-        formats it in its own idiom and gameplay code stays out of the UI.
-        Both loops already call updateSpeedBoost() once per iteration, so
-        the value is naturally fresh with no extra bookkeeping.
+        Seconds come back as plain numbers rather than display strings so
+        each renderer formats them in its own idiom and gameplay code stays
+        out of the UI. Both loops already call updatePowerUps() once per
+        iteration, so the values are naturally fresh with no extra
+        bookkeeping.
         """
-        if not self.speedBoostActive or self.speedBoostEndTime is None:
-            return None
-        return max(0.0, self.speedBoostEndTime - time.time())
+        return [
+            (getPowerUpDefinition(powerUpType)["hudLabel"], secondsRemaining)
+            for powerUpType, secondsRemaining in self.activePowerUps.statuses()
+        ]
 
     def resolveSelectedCosmeticColor(self):
         # Falls back to the original random-color behavior for "default"
@@ -761,11 +804,12 @@ class Ophidian:
         if "slow_starter" in purchasedUpgrades and self.level == 1:
             effectiveTickSpeed *= 1.25
         self.config.tickSpeed = effectiveTickSpeed
-        # speed food boost: reset on every initialize() (new run/level) so a
-        # boost never carries over into a tick speed the player didn't earn
-        # this life
-        self.speedBoostActive = False
-        self.speedBoostEndTime = None
+        # power-ups are reset on every initialize() (new run/level) so one
+        # never carries over into a life the player didn't earn it in. No
+        # effect needs reverting here: tickSpeed is recomputed from the
+        # stored base just above.
+        self.activePowerUps.clear()
+        self.tickSpeedBeforeBoost = None
         # second_wind upgrade: one near-miss available per run, consumed in moveEntity()
         self.secondWindAvailableThisRun = "second_wind" in purchasedUpgrades
         gridSize = computeGridSizeForLevel(
@@ -792,7 +836,7 @@ class Ophidian:
                 )
         ophidianName = self.saveManager.data["ophidianName"]
         self.notify(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
-        self.spawnFood()
+        self.spawnPickup()
         if self.ascensionBonus is not None:
             for _ in range(self.ascensionBonus["startingBonusSegments"]):
                 tail = self.selectedSnakePart.getTail()
@@ -834,7 +878,7 @@ class Ophidian:
     def runTextUI(self):
         """Run the game with text-based UI"""
         while self.running:
-            self.updateSpeedBoost()
+            self.updatePowerUps()
 
             # Check for key press (non-blocking)
             restarted = False
@@ -865,7 +909,7 @@ class Ophidian:
             self.textRenderer.renderHud(
                 self.saveManager.data.get("currency", 0),
                 self.getActiveUpgradesSummary(),
-                self.getSpeedBoostRemainingSeconds(),
+                self.getActivePowerUpStatuses(),
             )
             self.textRenderer.renderControls()
 
@@ -876,7 +920,7 @@ class Ophidian:
     def runPygameUI(self):
         """Run the game with pygame graphical UI"""
         while self.running:
-            self.updateSpeedBoost()
+            self.updatePowerUps()
 
             # tracked across the whole event drain rather than acted on
             # inside it: `continue` in the for loop only advanced to the

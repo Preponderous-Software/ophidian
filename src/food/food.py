@@ -1,10 +1,11 @@
 from lib.pyenvlib.entity import Entity
 
-# Growth food (the original behavior) adds a snake segment; speed food
-# instead grants a temporary speed boost. Kept as plain string ids to match
+# Growth food (the original behavior) adds a snake segment. Timed effects
+# are not food types: they spawn as their own PowerUp entities (see
+# powerup/powerup.py), so there is exactly one path for temporary effects
+# rather than two that can drift apart. Kept as a plain string id to match
 # the rest of the codebase's id conventions (see progression/shop.py).
 FOOD_TYPE_GROWTH = "growth"
-FOOD_TYPE_SPEED = "speed"
 
 
 # @author Daniel McCoy Stephenson

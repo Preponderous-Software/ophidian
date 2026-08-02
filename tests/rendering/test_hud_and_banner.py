@@ -2,6 +2,8 @@ import time
 
 from conftest import regionHasNonBackgroundPixel
 
+from powerup.powerup import PowerUpType
+
 
 def test_draw_ui_message_renders_notify_banner(pygameGame):
     game = pygameGame
@@ -60,12 +62,12 @@ def test_draw_hud_omits_upgrades_line_when_none_owned(pygameGame):
     assert not regionHasNonBackgroundPixel(surface, (0, 55, width, 15), game.config.white)
 
 
-def test_draw_hud_renders_speed_boost_line_while_a_boost_is_active(pygameGame):
-    # the "Speed boost!" banner expires well before the boost itself does,
-    # so the HUD has to carry the remainder (issue #114)
+def test_draw_hud_renders_power_up_line_while_one_is_active(pygameGame):
+    # a power-up's activation banner expires well before the power-up
+    # itself does, so the HUD has to carry the remainder (issue #114)
     game = pygameGame
     game.saveManager.data["purchasedUpgrades"] = ["head_start"]
-    game.activateSpeedBoost()
+    game.activatePowerUp(PowerUpType.SPEED)
     surface = game.gameDisplay
     surface.fill(game.config.white)  # matches the real frame's fill-before-draw
 
@@ -76,11 +78,11 @@ def test_draw_hud_renders_speed_boost_line_while_a_boost_is_active(pygameGame):
     assert regionHasNonBackgroundPixel(surface, (0, 73, width, 15), game.config.white)
 
 
-def test_draw_hud_moves_speed_boost_line_up_when_no_upgrades_are_owned(pygameGame):
+def test_draw_hud_moves_power_up_line_up_when_no_upgrades_are_owned(pygameGame):
     game = pygameGame
     game.saveManager.data["purchasedUpgrades"] = []
     game.secondWindAvailableThisRun = False
-    game.activateSpeedBoost()
+    game.activatePowerUp(PowerUpType.SPEED)
     surface = game.gameDisplay
     surface.fill(game.config.white)  # matches the real frame's fill-before-draw
 
@@ -94,7 +96,23 @@ def test_draw_hud_moves_speed_boost_line_up_when_no_upgrades_are_owned(pygameGam
     )
 
 
-def test_draw_hud_omits_speed_boost_line_when_no_boost_is_running(pygameGame):
+def test_draw_hud_gives_each_running_power_up_its_own_line(pygameGame):
+    game = pygameGame
+    game.saveManager.data["purchasedUpgrades"] = []
+    game.secondWindAvailableThisRun = False
+    game.activatePowerUp(PowerUpType.SPEED)
+    game.activatePowerUp(PowerUpType.INVINCIBILITY)
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+
+    game.drawHud()
+
+    width, _ = surface.get_size()
+    assert regionHasNonBackgroundPixel(surface, (0, 55, width, 15), game.config.white)
+    assert regionHasNonBackgroundPixel(surface, (0, 73, width, 15), game.config.white)
+
+
+def test_draw_hud_omits_power_up_line_when_none_is_running(pygameGame):
     game = pygameGame
     game.saveManager.data["purchasedUpgrades"] = []
     game.secondWindAvailableThisRun = False
@@ -109,14 +127,14 @@ def test_draw_hud_omits_speed_boost_line_when_no_boost_is_running(pygameGame):
     )
 
 
-def test_draw_hud_omits_speed_boost_line_for_a_boost_with_no_time_left(pygameGame):
-    # updateSpeedBoost() only clears an expired boost on the next tick, so
-    # the accessor can report 0 for one frame - don't draw "Speed boost: 0s"
+def test_draw_hud_omits_power_up_line_for_one_with_no_time_left(pygameGame):
+    # updatePowerUps() only clears an expired power-up on the next tick, so
+    # it stays readable for one frame - don't draw "Speed boost: 0s"
     game = pygameGame
     game.saveManager.data["purchasedUpgrades"] = []
     game.secondWindAvailableThisRun = False
-    game.activateSpeedBoost()
-    game.speedBoostEndTime = time.time() - 1
+    game.activatePowerUp(PowerUpType.SPEED)
+    game.activePowerUps.expiresAt[PowerUpType.SPEED] = time.time() - 1
     surface = game.gameDisplay
     surface.fill(game.config.white)  # matches the real frame's fill-before-draw
 

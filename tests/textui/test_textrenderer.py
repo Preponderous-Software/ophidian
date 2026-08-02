@@ -3,6 +3,7 @@ import pytest
 from config.config import Config
 from level.level import Level
 from food.food import Food
+from powerup.powerup import PowerUp, PowerUpType, getPowerUpDefinition
 from snake.snakePart import SnakePart
 from textui.textrenderer import TextRenderer
 
@@ -42,6 +43,41 @@ def test_render_grid_marks_head_body_and_food(renderer, capsys):
     assert gridLines[2].strip("│ ") == ". . F"
     assert "COLLISION" not in out
     assert "Legend: H=Head, S=Snake, F=Food, .=Empty" in out
+
+
+def test_render_grid_marks_power_ups_with_their_own_symbol(renderer, capsys):
+    level = Level("Level 1", 3)
+    environment = level.environment
+
+    head = SnakePart((0, 255, 0))
+    environment.addEntityToLocation(head, locationAt(environment, 0, 0))
+    powerUp = PowerUp(PowerUpType.SPEED)
+    environment.addEntityToLocation(powerUp, locationAt(environment, 2, 2))
+
+    renderer.renderGrid(environment, [head], collision=False)
+
+    out = capsys.readouterr().out
+    symbol = getPowerUpDefinition(PowerUpType.SPEED)["textSymbol"]
+    assert out.splitlines()[3].strip("│ ") == ". . {}".format(symbol)
+    assert "{}=Speed Boost".format(symbol) in out
+
+
+def test_render_grid_legend_only_lists_power_ups_that_are_on_the_board(
+    renderer, capsys
+):
+    level = Level("Level 1", 3)
+    environment = level.environment
+    head = SnakePart((0, 255, 0))
+    environment.addEntityToLocation(head, locationAt(environment, 0, 0))
+    environment.addEntityToLocation(
+        PowerUp(PowerUpType.INVINCIBILITY), locationAt(environment, 1, 1)
+    )
+
+    renderer.renderGrid(environment, [head], collision=False)
+
+    out = capsys.readouterr().out
+    assert "=Invincibility" in out
+    assert "=Speed Boost" not in out
 
 
 def test_render_grid_reports_collision(renderer, capsys):
@@ -96,26 +132,28 @@ def test_render_hud_omits_upgrades_line_when_none_active(renderer, capsys):
     assert "Active upgrades" not in out
 
 
-def test_render_hud_shows_remaining_speed_boost_rounded_up(renderer, capsys):
+def test_render_hud_shows_remaining_power_up_time_rounded_up(renderer, capsys):
     renderer.renderHud(
-        currency=0, activeUpgradeLabels=[], speedBoostSecondsRemaining=2.4
+        currency=0, activeUpgradeLabels=[], powerUpStatuses=[("Speed boost", 2.4)]
     )
 
     assert "Speed boost: 3s" in capsys.readouterr().out
 
 
-def test_render_hud_omits_speed_boost_line_when_no_boost_is_running(renderer, capsys):
+def test_render_hud_lists_every_active_power_up(renderer, capsys):
+    renderer.renderHud(
+        currency=0,
+        activeUpgradeLabels=[],
+        powerUpStatuses=[("Speed boost", 2.4), ("Invincible", 1.1)],
+    )
+
+    out = capsys.readouterr().out
+    assert "Speed boost: 3s" in out
+    assert "Invincible: 2s" in out
+
+
+def test_render_hud_omits_power_up_lines_when_none_are_running(renderer, capsys):
     renderer.renderHud(currency=0, activeUpgradeLabels=[])
-
-    assert "Speed boost" not in capsys.readouterr().out
-
-
-def test_render_hud_omits_speed_boost_line_for_a_boost_with_no_time_left(
-    renderer, capsys
-):
-    # a boost whose timer has run out is readable for the one frame before
-    # updateSpeedBoost() clears it - don't advertise "Speed boost: 0s"
-    renderer.renderHud(currency=0, activeUpgradeLabels=[], speedBoostSecondsRemaining=0)
 
     assert "Speed boost" not in capsys.readouterr().out
 
