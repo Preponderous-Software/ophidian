@@ -1,6 +1,7 @@
 from textui.textrenderer import TextRenderer
 
 from ophidian import Ophidian
+from scoring.scoring import pointsForFood
 from snake.snakePart import SnakePart
 
 
@@ -24,16 +25,30 @@ def _moveHeadToCenter(game):
     return grid, centerLocation
 
 
-def test_calculate_score_is_length_times_percentage_of_grid(tmp_path, monkeypatch):
+def test_awarding_points_for_food_banks_what_one_pickup_is_worth(tmp_path, monkeypatch):
     game = _makeGame(monkeypatch, tmp_path)
     numLocations = len(game.environment.grid.getLocations())
     # force a known snake length rather than relying on the initial spawn
     game.snakeParts = [game.selectedSnakePart] * 5
+    game.score = 0
 
-    game.calculateScore()
+    game.awardPointsForFood()
 
-    expectedPercentage = int(5 / numLocations * 100)
-    assert game.score == 5 * expectedPercentage
+    assert game.score == pointsForFood(5, numLocations)
+
+
+def test_awarding_points_accumulates_rather_than_recalculating(tmp_path, monkeypatch):
+    # the score is banked per pickup so a multiplier can scale a single
+    # award without rewriting everything earned before it (issue #73)
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    game.snakeParts = [game.selectedSnakePart] * 5
+    game.score = 0
+
+    game.awardPointsForFood()
+    game.awardPointsForFood()
+
+    assert game.score == 2 * pointsForFood(5, numLocations)
 
 
 def test_get_color_of_location_returns_white_for_the_missing_sentinel(

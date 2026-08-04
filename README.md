@@ -42,14 +42,25 @@ The text-based UI is perfect for:
 Most of what spawns on the board is food, which grows the ophidian by one segment.
 The rest are power-ups, which grant a temporary effect instead of growing you:
 
-Power-up | Effect | Duration
------------- | ------------- | -------------
-Speed Boost | the ophidian moves twice as fast | 5s
-Invincibility | collisions with your own body no longer end the run | 3s
+Power-up | Effect | Duration | Chance per pickup
+------------ | ------------- | ------------- | -------------
+Speed Boost | the ophidian moves twice as fast | 5s | 15%
+Invincibility | collisions with your own body no longer end the run | 3s | 5%
+Score Multiplier | food is worth double points | 10s | 15%
 
 Whatever is currently running is listed on the HUD with its remaining time, in both
 UIs. In the text UI, power-ups appear on the grid as their own symbol and are listed
 in the legend beneath it.
+
+## Scoring
+Points are banked as they are earned, one award per piece of food eaten. An award is
+worth a flat 10 points plus one point per percent of the grid the ophidian already
+fills, so bites get more valuable as the board fills up. While the Score Multiplier
+runs, each award is doubled — points earned before it are left alone, and points
+earned after it expires go back to normal. The text UI marks the score line with
+`(x2)` for as long as the multiplier lasts.
+
+Note that the score resets at the start of each level, alongside the board.
 
 ## Controls
 Key | Action

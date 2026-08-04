@@ -11,9 +11,11 @@ from powerup.powerup import (
     getPowerUpDefinition,
     getPowerUpDurationSeconds,
     getPowerUpHudLabel,
+    getScoreMultiplier,
     rollPowerUpType,
 )
 from powerup.active import ActivePowerUps
+from scoring.scoring import applyScoreMultiplier, getGridFillPercentage, pointsForFood
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
@@ -136,16 +138,38 @@ class Ophidian:
             color = self.getColorOfLocation(location)
         self.graphik.drawRectangle(xPos, yPos, width, height, color)
 
-    def calculateScore(self):
-        length = len(self.snakeParts)
-        numLocations = len(self.environment.grid.getLocations())
-        percentage = int(length / numLocations * 100)
-        self.score = length * percentage
+    def awardPointsForFood(self):
+        """Banks the points one growth-food pickup is worth.
+
+        Score accumulates per pickup instead of being recalculated from the
+        ophidian's current size, so the score-multiplier power-up can double
+        what a bite is worth while it runs without retroactively doubling -
+        and then un-doubling - everything banked before it (see issue #73).
+        What a bite is worth lives in scoring/scoring.py; this method only
+        decides when one is earned and at what multiplier.
+        """
+        basePoints = pointsForFood(
+            len(self.snakeParts), len(self.environment.grid.getLocations())
+        )
+        self.score += applyScoreMultiplier(basePoints, self.getActiveScoreMultiplier())
+
+    def getActiveScoreMultiplier(self):
+        """The combined score multiplier of every power-up currently running.
+
+        Multiplied together rather than picked from, so two multiplier
+        power-ups running at once would compound instead of one silently
+        winning. 1.0 when nothing is active, or when what is active doesn't
+        touch scoring.
+        """
+        multiplier = 1.0
+        for powerUpType, _ in self.activePowerUps.statuses():
+            multiplier *= getScoreMultiplier(powerUpType)
+        return multiplier
 
     def displayStatsInConsole(self):
         length = len(self.snakeParts)
         numLocations = len(self.environment.grid.getLocations())
-        percentage = int(length / numLocations * 100)
+        percentage = getGridFillPercentage(length, numLocations)
         print(
             "The ophidian had a length of",
             length,
@@ -432,7 +456,9 @@ class Ophidian:
             self.activatePowerUp(pickup.getPowerUpType())
         else:
             self.spawnSnakePart(entity.getTail(), pickupColor)
-        self.calculateScore()
+            # only growth food is worth points; a power-up pays out through
+            # its effect instead
+            self.awardPointsForFood()
 
     def movePreviousSnakePart(self, snakePart):
         previousSnakePart = snakePart.previousSnakePart
@@ -905,7 +931,11 @@ class Ophidian:
             # the pygame loop
             self.textRenderer.renderMessage(self.uiBanner.current())
             self.textRenderer.renderStats(
-                self.level, len(self.snakeParts), self.score, percentage
+                self.level,
+                len(self.snakeParts),
+                self.score,
+                percentage,
+                self.getActiveScoreMultiplier(),
             )
             self.textRenderer.renderHud(
                 self.saveManager.data.get("currency", 0),

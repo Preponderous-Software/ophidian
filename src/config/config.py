@@ -36,12 +36,19 @@ class Config:
         self.tickSpeed = 0.15
 
         # pickups
-        # 80% of spawned pickups are growth food; the remainder are
+        # 65% of spawned pickups are growth food; the remainder are
         # power-ups (see issue #71). How long each power-up lasts and what
         # it does lives with its registry entry in powerup/powerup.py,
         # alongside its spawn weight, the same way progression/shop.py owns
         # its upgrades' costs and effects.
-        self.growthFoodSpawnRate = 0.8
+        #
+        # The 35% power-up share is the sum of the absolute rates the
+        # power-up issues each asked for - 15% speed (#71), 5%
+        # invincibility (#74), 15% score multiplier (#73) - so adding a
+        # type means raising the share rather than diluting the types
+        # already there. powerup.getAbsoluteSpawnRates() derives the
+        # per-type rates from this and is asserted against those numbers.
+        self.growthFoodSpawnRate = 0.65
 
         # misc
         self.debug = False

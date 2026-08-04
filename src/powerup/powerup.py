@@ -28,12 +28,16 @@ class PowerUpType(str, Enum):
 
     SPEED = "speed"
     INVINCIBILITY = "invincibility"
+    SCORE_MULTIPLIER = "score_multiplier"
 
 
 # spawnWeight is relative *within* the power-up share of spawned pickups,
-# which is 1 - config.growthFoodSpawnRate (20% by default). Weights of 3 and
-# 1 therefore work out to a 15% speed / 5% invincibility chance per pickup,
-# the rates asked for in issues #71 and #74.
+# which is 1 - config.growthFoodSpawnRate (35% by default). Weights of 3, 1
+# and 3 therefore work out to a 15% speed / 5% invincibility / 15% score
+# multiplier chance per pickup, the rates asked for in issues #71, #74 and
+# #73. getAbsoluteSpawnRates() below turns the weights back into those
+# rates, so a new type can be checked against the rate its issue asks for
+# instead of the arithmetic being redone by hand.
 POWER_UP_DEFINITIONS = {
     PowerUpType.SPEED: {
         "id": PowerUpType.SPEED,
@@ -59,10 +63,27 @@ POWER_UP_DEFINITIONS = {
         "spawnWeight": 1,
         "durationSeconds": 3.0,
     },
+    PowerUpType.SCORE_MULTIPLIER: {
+        "id": PowerUpType.SCORE_MULTIPLIER,
+        "name": "Score Multiplier",
+        "hudLabel": "Double points",
+        "activationMessage": "Points are doubled!",
+        "expiryMessage": "The point multiplier fades.",
+        "color": (255, 0, 255),
+        "textSymbol": "x",
+        "spawnWeight": 3,
+        "durationSeconds": 10.0,
+        # points banked for a pickup are scaled by this while it runs
+        "scoreMultiplier": 2.0,
+    },
 }
 
 # Stable order for spawning rolls and HUD listings.
-POWER_UP_ORDER = [PowerUpType.SPEED, PowerUpType.INVINCIBILITY]
+POWER_UP_ORDER = [
+    PowerUpType.SPEED,
+    PowerUpType.INVINCIBILITY,
+    PowerUpType.SCORE_MULTIPLIER,
+]
 
 
 def listPowerUpTypes():
@@ -90,6 +111,35 @@ def getPowerUpHudLabel(powerUpType):
 
 def getPowerUpDurationSeconds(powerUpType):
     return getPowerUpDefinition(powerUpType)["durationSeconds"]
+
+
+def getScoreMultiplier(powerUpType):
+    """How much a power-up scales points earned while it runs.
+
+    1.0 for the types that don't touch scoring at all, so a caller can
+    multiply by this unconditionally instead of special-casing them.
+    """
+    return getPowerUpDefinition(powerUpType).get("scoreMultiplier", 1.0)
+
+
+def getAbsoluteSpawnRates(powerUpShare):
+    """{type: chance of being the next pickup} for a given power-up share.
+
+    powerUpShare is the fraction of spawned pickups that are power-ups at
+    all - 1 - config.growthFoodSpawnRate. The per-type spawn rates the
+    issues specify are absolute ones like "15% of pickups", while the
+    registry stores relative weights, so this is where the two meet.
+    """
+    types = listPowerUpTypes()
+    totalWeight = sum(
+        POWER_UP_DEFINITIONS[powerUpType]["spawnWeight"] for powerUpType in types
+    )
+    return {
+        powerUpType: powerUpShare
+        * POWER_UP_DEFINITIONS[powerUpType]["spawnWeight"]
+        / totalWeight
+        for powerUpType in types
+    }
 
 
 def rollPowerUpType(rng=random):

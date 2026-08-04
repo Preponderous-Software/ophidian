@@ -3,6 +3,7 @@ from textui.textrenderer import TextRenderer
 from food.food import Food, FOOD_TYPE_GROWTH
 from ophidian import Ophidian
 from powerup.powerup import PowerUp, PowerUpType, getPowerUpDefinition
+from scoring.scoring import pointsForFood
 from snake.snakePart import SnakePart
 
 
@@ -71,6 +72,106 @@ def test_collecting_a_speed_power_up_boosts_speed_and_does_not_grow_the_snake(
     assert len(game.snakeParts) == startingLength
     assert game.activePowerUps.isActive(PowerUpType.SPEED) is True
     assert game.config.tickSpeed == baseTickSpeed / multiplier
+
+
+def test_collecting_a_score_multiplier_power_up_starts_it_without_growing(
+    tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    _placeInFrontOfHead(game, PowerUp(PowerUpType.SCORE_MULTIPLIER))
+    startingLength = len(game.snakeParts)
+    startingScore = game.score
+    baseTickSpeed = game.config.tickSpeed
+
+    game.moveEntity(game.selectedSnakePart, 0)
+
+    assert len(game.snakeParts) == startingLength
+    assert game.activePowerUps.isActive(PowerUpType.SCORE_MULTIPLIER) is True
+    # collecting it is not itself worth points, and it must not touch speed
+    assert game.score == startingScore
+    assert game.config.tickSpeed == baseTickSpeed
+
+
+def test_active_score_multiplier_is_neutral_when_nothing_is_running(
+    tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path)
+
+    assert game.getActiveScoreMultiplier() == 1.0
+
+
+def test_a_speed_boost_alone_does_not_multiply_the_score(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+
+    game.activatePowerUp(PowerUpType.SPEED)
+
+    assert game.getActiveScoreMultiplier() == 1.0
+
+
+def test_food_eaten_while_the_multiplier_runs_is_worth_double(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    game.snakeParts = [game.selectedSnakePart] * 4
+    game.score = 0
+
+    game.activatePowerUp(PowerUpType.SCORE_MULTIPLIER)
+    game.awardPointsForFood()
+
+    assert game.getActiveScoreMultiplier() == 2.0
+    assert game.score == 2 * pointsForFood(4, numLocations)
+
+
+def test_points_earned_before_the_multiplier_are_not_retroactively_doubled(
+    tmp_path, monkeypatch
+):
+    # the whole reason the score is banked per pickup (issue #73): scaling a
+    # recomputed total would rewrite everything already earned
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    game.snakeParts = [game.selectedSnakePart] * 4
+    game.score = 0
+
+    game.awardPointsForFood()
+    game.activatePowerUp(PowerUpType.SCORE_MULTIPLIER)
+    game.awardPointsForFood()
+
+    expected = pointsForFood(4, numLocations) * 3
+    assert game.score == expected
+
+
+def test_points_return_to_normal_once_the_multiplier_expires(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    game.snakeParts = [game.selectedSnakePart] * 4
+    game.score = 0
+
+    game.activatePowerUp(PowerUpType.SCORE_MULTIPLIER)
+    game.awardPointsForFood()
+    scoreWhileDoubled = game.score
+
+    endTime = game.activePowerUps.expiresAt[PowerUpType.SCORE_MULTIPLIER]
+    monkeypatch.setattr("powerup.active.time.time", lambda: endTime + 1)
+    game.updatePowerUps()
+    game.awardPointsForFood()
+
+    assert game.activePowerUps.isActive(PowerUpType.SCORE_MULTIPLIER) is False
+    assert game.getActiveScoreMultiplier() == 1.0
+    # the doubled award is kept; only the new one is back to normal
+    assert game.score == scoreWhileDoubled + pointsForFood(4, numLocations)
+
+
+def test_the_running_multiplier_is_listed_on_both_huds(tmp_path, monkeypatch):
+    # getActivePowerUpStatuses is what drawHud and TextRenderer.renderHud
+    # both read, so this is the shared "clearly see which power-ups are
+    # active" path
+    game = _makeGame(monkeypatch, tmp_path)
+
+    game.activatePowerUp(PowerUpType.SCORE_MULTIPLIER)
+    endTime = game.activePowerUps.expiresAt[PowerUpType.SCORE_MULTIPLIER]
+    monkeypatch.setattr("powerup.active.time.time", lambda: endTime - 4)
+
+    assert game.getActivePowerUpStatuses() == [("Double points", 4)]
 
 
 def test_collecting_an_invincibility_power_up_starts_it(tmp_path, monkeypatch):
