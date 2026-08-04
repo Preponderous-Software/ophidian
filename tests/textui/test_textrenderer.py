@@ -103,6 +103,26 @@ def test_render_stats_shows_level_length_score_and_progress(renderer, capsys):
     assert "█" * 15 + "░" * 15 in out
 
 
+def test_render_stats_annotates_the_score_while_a_multiplier_runs(renderer, capsys):
+    renderer.renderStats(
+        level=3, snakeLength=5, score=120, percentage=0.5, scoreMultiplier=2.0
+    )
+
+    assert "Score: 120 (x2)" in capsys.readouterr().out
+
+
+def test_render_stats_leaves_the_score_unannotated_at_a_neutral_multiplier(
+    renderer, capsys
+):
+    renderer.renderStats(
+        level=3, snakeLength=5, score=120, percentage=0.5, scoreMultiplier=1.0
+    )
+
+    out = capsys.readouterr().out
+    assert "Score: 120" in out
+    assert "(x" not in out
+
+
 def test_render_message_prints_the_current_notification(renderer, capsys):
     renderer.renderMessage("Speed boost!")
 

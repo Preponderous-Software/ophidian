@@ -2,15 +2,18 @@ import random
 
 import pytest
 
+from config.config import Config
 from powerup.powerup import (
     POWER_UP_DEFINITIONS,
     POWER_UP_ORDER,
     PowerUp,
     PowerUpType,
+    getAbsoluteSpawnRates,
     getPowerUpDefinition,
     getPowerUpDurationSeconds,
     getPowerUpHudLabel,
     getPowerUpName,
+    getScoreMultiplier,
     listPowerUpTypes,
     rollPowerUpType,
 )
@@ -90,17 +93,38 @@ def test_roll_weights_each_type_by_its_spawn_weight():
     ]
 
 
-def test_invincibility_is_five_percent_of_pickups_at_the_default_food_rate():
-    # issue #74 asks for a 5% spawn rate; power-ups are 20% of pickups
-    # (1 - Config.growthFoodSpawnRate), so its weight must be a quarter of
-    # the total
-    totalWeight = sum(
-        definition["spawnWeight"] for definition in POWER_UP_DEFINITIONS.values()
-    )
-    invincibilityShare = (
-        POWER_UP_DEFINITIONS[PowerUpType.INVINCIBILITY]["spawnWeight"] / totalWeight
-    )
-    assert pytest.approx(0.05) == 0.2 * invincibilityShare
+def test_each_type_spawns_at_the_rate_its_issue_asked_for():
+    # the weights are relative, but every power-up issue specified an
+    # absolute share of pickups: 15% speed (#71), 5% invincibility (#74),
+    # 15% score multiplier (#73). Read against the real Config so raising
+    # growthFoodSpawnRate without re-balancing the weights fails here.
+    rates = getAbsoluteSpawnRates(1 - Config().growthFoodSpawnRate)
+
+    assert rates[PowerUpType.SPEED] == pytest.approx(0.15)
+    assert rates[PowerUpType.INVINCIBILITY] == pytest.approx(0.05)
+    assert rates[PowerUpType.SCORE_MULTIPLIER] == pytest.approx(0.15)
+
+
+def test_absolute_spawn_rates_sum_to_the_whole_power_up_share():
+    rates = getAbsoluteSpawnRates(0.4)
+
+    assert sum(rates.values()) == pytest.approx(0.4)
+    assert sorted(rates) == sorted(PowerUpType)
+
+
+def test_score_multiplier_doubles_points_for_ten_seconds():
+    # the numbers issue #73 asks for
+    definition = getPowerUpDefinition(PowerUpType.SCORE_MULTIPLIER)
+
+    assert definition["scoreMultiplier"] == 2.0
+    assert definition["durationSeconds"] == 10.0
+
+
+def test_types_that_do_not_touch_scoring_report_a_neutral_multiplier():
+    # lets gameplay multiply by every running power-up unconditionally
+    assert getScoreMultiplier(PowerUpType.SPEED) == 1.0
+    assert getScoreMultiplier(PowerUpType.INVINCIBILITY) == 1.0
+    assert getScoreMultiplier(PowerUpType.SCORE_MULTIPLIER) == 2.0
 
 
 def test_roll_only_ever_returns_a_defined_type():

@@ -104,11 +104,21 @@ class TextRenderer:
             return
         print(f"\n>>> {message}")
 
-    def renderStats(self, level, snakeLength, score, percentage):
-        """Render game statistics"""
+    def renderStats(self, level, snakeLength, score, percentage, scoreMultiplier=1.0):
+        """Render game statistics
+
+        scoreMultiplier arrives as a plain number and is annotated onto the
+        score line here, so the player can tell a doubled bite from a normal
+        one at the moment it is banked rather than only from the power-up's
+        countdown. Defaults to 1.0 (no annotation) so a caller that doesn't
+        care about multipliers is unaffected.
+        """
         print(f"\nLevel: {level}")
         print(f"Length: {snakeLength}")
-        print(f"Score: {score}")
+        if scoreMultiplier > 1:
+            print(f"Score: {score} (x{scoreMultiplier:g})")
+        else:
+            print(f"Score: {score}")
         print(f"Progress: {int(percentage * 100)}%")
         
         # Draw progress bar
