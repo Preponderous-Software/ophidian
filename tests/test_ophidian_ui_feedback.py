@@ -23,7 +23,9 @@ def test_cycle_selected_cosmetic_updates_live_snake_part_color(tmp_path, monkeyp
     assert game.selectedSnakePart.getColor() == SKINS_BY_ID["ember"]["color"]
 
 
-def test_cycle_selected_cosmetic_wraps_and_updates_color_each_time(tmp_path, monkeypatch):
+def test_cycle_selected_cosmetic_wraps_and_updates_color_each_time(
+    tmp_path, monkeypatch
+):
     game = _makeGame(monkeypatch, tmp_path)
     game.saveManager.data["unlockedCosmetics"] = ["default", "ember", "frost"]
     game.saveManager.data["selectedCosmetic"] = "frost"
@@ -107,10 +109,10 @@ def test_text_ui_l_key_toggles_tick_speed_limit(tmp_path, monkeypatch):
     game = _makeGame(monkeypatch, tmp_path)
     startingValue = game.config.limitTickSpeed
 
-    game.handleKeyDownEvent('l')
+    game.handleKeyDownEvent("l")
     assert game.config.limitTickSpeed == (not startingValue)
 
-    game.handleKeyDownEvent('l')
+    game.handleKeyDownEvent("l")
     assert game.config.limitTickSpeed == startingValue
 
 
@@ -138,15 +140,24 @@ def test_spawn_snake_part_prefers_an_empty_neighbor_over_occupied_ones(
     # these cells before we moved the head here - clear them all so the
     # occupancy setup below is deterministic regardless of where it landed
     leftLocation = grid.getLeft(tailLocation)
-    for neighbor in (grid.getUp(tailLocation), grid.getDown(tailLocation), grid.getRight(tailLocation), leftLocation):
+    for neighbor in (
+        grid.getUp(tailLocation),
+        grid.getDown(tailLocation),
+        grid.getRight(tailLocation),
+        leftLocation,
+    ):
         for entityId in list(neighbor.getEntities().keys()):
             neighbor.removeEntity(neighbor.getEntity(entityId))
 
     # selectedSnakePart's direction defaults to 0 (up), which
     # spawnSnakePart always excludes regardless of occupancy - occupy the
     # remaining two neighbors, leaving exactly "left" empty
-    game.environment.addEntityToLocation(SnakePart((0, 0, 0)), grid.getDown(tailLocation))
-    game.environment.addEntityToLocation(SnakePart((0, 0, 0)), grid.getRight(tailLocation))
+    game.environment.addEntityToLocation(
+        SnakePart((0, 0, 0)), grid.getDown(tailLocation)
+    )
+    game.environment.addEntityToLocation(
+        SnakePart((0, 0, 0)), grid.getRight(tailLocation)
+    )
 
     game.spawnSnakePart(game.selectedSnakePart, (1, 2, 3))
 

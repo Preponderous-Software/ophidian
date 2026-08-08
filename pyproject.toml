@@ -1,0 +1,11 @@
+# Tool configuration only - Ophidian is run from source (run.sh) rather than
+# installed, so there is no [project]/[build-system] table here.
+
+[tool.black]
+# src/lib holds vendored copies of graphik and py_env_lib. Reformatting them
+# makes re-vendoring an upstream copy a merge conflict for no benefit, so they
+# are excluded here rather than in format.sh's arguments - that way an editor
+# integration or a bare `black src` picks the exclusion up too (see issue #120).
+extend-exclude = '''
+/src/lib/
+'''

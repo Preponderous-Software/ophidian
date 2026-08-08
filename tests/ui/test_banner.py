@@ -70,7 +70,9 @@ def test_draw_calls_graphik_with_current_message(monkeypatch):
         def drawText(self, *args):
             calls.append(("text", args))
 
-    banner.draw(FakeGraphik(), width=500, backgroundColor=(0, 0, 0), textColor=(255, 255, 255))
+    banner.draw(
+        FakeGraphik(), width=500, backgroundColor=(0, 0, 0), textColor=(255, 255, 255)
+    )
 
     assert ("rect", (0, 0, 500, 30, (0, 0, 0))) in calls
     assert ("text", ("hello", 250, 15, 16, (255, 255, 255))) in calls
@@ -87,5 +89,7 @@ def test_draw_does_nothing_when_queue_empty():
         def drawText(self, *args):
             calls.append("text")
 
-    banner.draw(FakeGraphik(), width=500, backgroundColor=(0, 0, 0), textColor=(255, 255, 255))
+    banner.draw(
+        FakeGraphik(), width=500, backgroundColor=(0, 0, 0), textColor=(255, 255, 255)
+    )
     assert calls == []

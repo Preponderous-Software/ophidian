@@ -19,7 +19,12 @@ from scoring.scoring import applyScoreMultiplier, getGridFillPercentage, pointsF
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
-from progression.cosmetics import checkForNewUnlocks, getNextCosmeticId, getSkinColor, getSkinName
+from progression.cosmetics import (
+    checkForNewUnlocks,
+    getNextCosmeticId,
+    getSkinColor,
+    getSkinName,
+)
 from progression.shop import (
     currencyEarnedForRun,
     getActiveUpgradeLabels,
@@ -42,23 +47,25 @@ class Ophidian:
     def __init__(self, useTextUI=False):
         self.config = Config()
         self.config.useTextUI = useTextUI
-        
+
         # Import pygame and graphik only if not using text UI
         if not self.config.useTextUI:
             import pygame
+
             self.pygame = pygame
             from lib.graphik.src.graphik import Graphik
-            
+
             pygame.init()
             self.initializeGameDisplay()
             pygame.display.set_icon(pygame.image.load("src/media/icon.PNG"))
             self.graphik = Graphik(self.gameDisplay)
         else:
             from textui.textrenderer import TextRenderer
+
             self.pygame = None
             self.textRenderer = TextRenderer(self.config)
             self.textRenderer.enableRawMode()
-        
+
         self.saveManager = SaveManager()
         if self.saveManager.data["ophidianName"] is None:
             self.saveManager.data["ophidianName"] = generateOphidianName()
@@ -85,20 +92,22 @@ class Ophidian:
     def initializeGameDisplay(self):
         if self.config.useTextUI:
             return  # No display needed for text UI
-        
+
         if self.config.fullscreen:
             self.gameDisplay = self.pygame.display.set_mode(
-                (self.config.displayWidth, self.config.displayHeight), self.pygame.FULLSCREEN
+                (self.config.displayWidth, self.config.displayHeight),
+                self.pygame.FULLSCREEN,
             )
         else:
             self.gameDisplay = self.pygame.display.set_mode(
-                (self.config.displayWidth, self.config.displayHeight), self.pygame.RESIZABLE
+                (self.config.displayWidth, self.config.displayHeight),
+                self.pygame.RESIZABLE,
             )
 
     def initializeLocationWidthAndHeight(self):
         if self.config.useTextUI:
             return  # Not needed for text UI
-        
+
         x, y = self.gameDisplay.get_size()
         self.locationWidth = x / self.environment.getGrid().getRows()
         self.locationHeight = y / self.environment.getGrid().getColumns()
@@ -107,7 +116,7 @@ class Ophidian:
     def drawEnvironment(self):
         if self.config.useTextUI:
             return  # Rendering handled separately in text UI
-        
+
         for locationId in self.environment.getGrid().getLocations():
             location = self.environment.getGrid().getLocation(locationId)
             self.drawLocation(
@@ -221,7 +230,9 @@ class Ophidian:
         # bank currency earned this run before folding it into lifetime stats;
         # recordRun() below calls saveManager.save() which persists both
         earnedCurrency = currencyEarnedForRun(len(self.snakeParts))
-        self.saveManager.data["currency"] = self.saveManager.data.get("currency", 0) + earnedCurrency
+        self.saveManager.data["currency"] = (
+            self.saveManager.data.get("currency", 0) + earnedCurrency
+        )
         self.lastObituary = self.saveManager.recordRun(
             length=len(self.snakeParts),
             level=self.level,
@@ -546,47 +557,47 @@ class Ophidian:
         # For text UI, key is a character; for pygame, it's a key code
         if self.config.useTextUI:
             # Text UI key handling
-            if key == 'q':
+            if key == "q":
                 self.running = False
-            elif key == 'w' or key == '\x1b[A':  # w or up arrow
+            elif key == "w" or key == "\x1b[A":  # w or up arrow
                 if (
                     self.changedDirectionThisTick == False
                     and self.selectedSnakePart.getDirection() != 2
                 ):
                     self.selectedSnakePart.setDirection(0)
                     self.changedDirectionThisTick = True
-            elif key == 'a' or key == '\x1b[D':  # a or left arrow
+            elif key == "a" or key == "\x1b[D":  # a or left arrow
                 if (
                     self.changedDirectionThisTick == False
                     and self.selectedSnakePart.getDirection() != 3
                 ):
                     self.selectedSnakePart.setDirection(1)
                     self.changedDirectionThisTick = True
-            elif key == 's' or key == '\x1b[B':  # s or down arrow
+            elif key == "s" or key == "\x1b[B":  # s or down arrow
                 if (
                     self.changedDirectionThisTick == False
                     and self.selectedSnakePart.getDirection() != 0
                 ):
                     self.selectedSnakePart.setDirection(2)
                     self.changedDirectionThisTick = True
-            elif key == 'd' or key == '\x1b[C':  # d or right arrow
+            elif key == "d" or key == "\x1b[C":  # d or right arrow
                 if (
                     self.changedDirectionThisTick == False
                     and self.selectedSnakePart.getDirection() != 1
                 ):
                     self.selectedSnakePart.setDirection(3)
                     self.changedDirectionThisTick = True
-            elif key == 'l':
+            elif key == "l":
                 if self.config.limitTickSpeed:
                     self.config.limitTickSpeed = False
                 else:
                     self.config.limitTickSpeed = True
-            elif key == 'r':
+            elif key == "r":
                 self.restartRun()
                 return "restart"
-            elif key == 'c':
+            elif key == "c":
                 self.cycleSelectedCosmetic()
-            elif key == 'p':
+            elif key == "p":
                 self.openShop()
                 return "restart"
         else:
@@ -677,9 +688,7 @@ class Ophidian:
             self.getLocationDirection(direction, grid, location)
             for direction in range(4)
         ]
-        onGridNeighbors = [
-            neighbor for neighbor in neighbors if neighbor != -1
-        ]
+        onGridNeighbors = [neighbor for neighbor in neighbors if neighbor != -1]
         emptyCandidates = [
             neighbor
             for neighbor in onGridNeighbors
@@ -980,7 +989,9 @@ class Ophidian:
             percentage = len(self.snakeParts) / len(
                 self.environment.grid.getLocations()
             )
-            self.pygame.draw.rect(self.gameDisplay, self.config.black, (0, y - 20, x, 20))
+            self.pygame.draw.rect(
+                self.gameDisplay, self.config.black, (0, y - 20, x, 20)
+            )
             if percentage < self.config.levelProgressPercentageRequired / 2:
                 self.pygame.draw.rect(
                     self.gameDisplay, self.config.red, (0, y - 20, x * percentage, 20)
@@ -995,7 +1006,9 @@ class Ophidian:
                 self.pygame.draw.rect(
                     self.gameDisplay, self.config.green, (0, y - 20, x * percentage, 20)
                 )
-            self.pygame.draw.rect(self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1)
+            self.pygame.draw.rect(
+                self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1
+            )
 
             self.drawHud()
             self.drawUiMessage()
@@ -1009,10 +1022,13 @@ class Ophidian:
 import argparse
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Ophidian - A snake game')
-    parser.add_argument('--text-ui', action='store_true', 
-                        help='Use text-based UI instead of graphical UI')
+    parser = argparse.ArgumentParser(description="Ophidian - A snake game")
+    parser.add_argument(
+        "--text-ui",
+        action="store_true",
+        help="Use text-based UI instead of graphical UI",
+    )
     args = parser.parse_args()
-    
+
     ophidian = Ophidian(useTextUI=args.text_ui)
     ophidian.run()

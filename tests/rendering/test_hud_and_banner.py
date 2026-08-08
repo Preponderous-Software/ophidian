@@ -29,7 +29,9 @@ def test_draw_ui_message_is_a_noop_with_no_pending_message(pygameGame):
     game.drawUiMessage()
 
     width, _ = surface.get_size()
-    assert not regionHasNonBackgroundPixel(surface, (0, 0, width, 30), game.config.white)
+    assert not regionHasNonBackgroundPixel(
+        surface, (0, 0, width, 30), game.config.white
+    )
 
 
 def test_draw_hud_renders_currency_and_owned_upgrades(pygameGame):
@@ -59,7 +61,9 @@ def test_draw_hud_omits_upgrades_line_when_none_owned(pygameGame):
     # currency line still renders...
     assert regionHasNonBackgroundPixel(surface, (0, 35, width, 15), game.config.white)
     # ...but the upgrades line is skipped entirely when nothing is owned
-    assert not regionHasNonBackgroundPixel(surface, (0, 55, width, 15), game.config.white)
+    assert not regionHasNonBackgroundPixel(
+        surface, (0, 55, width, 15), game.config.white
+    )
 
 
 def test_draw_hud_renders_power_up_line_while_one_is_active(pygameGame):

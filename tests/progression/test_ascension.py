@@ -18,12 +18,8 @@ def test_compute_grid_size_matches_original_formula_for_level_one():
 
 def test_compute_grid_size_matches_original_formula_for_higher_levels():
     # original formula: gridSize + (level - 1) * 2
-    assert (
-        computeGridSizeForLevel(2, BASE_GRID_SIZE, MIN_GRID_SIZE, MAX_GRID_SIZE) == 7
-    )
-    assert (
-        computeGridSizeForLevel(3, BASE_GRID_SIZE, MIN_GRID_SIZE, MAX_GRID_SIZE) == 9
-    )
+    assert computeGridSizeForLevel(2, BASE_GRID_SIZE, MIN_GRID_SIZE, MAX_GRID_SIZE) == 7
+    assert computeGridSizeForLevel(3, BASE_GRID_SIZE, MIN_GRID_SIZE, MAX_GRID_SIZE) == 9
     assert (
         computeGridSizeForLevel(4, BASE_GRID_SIZE, MIN_GRID_SIZE, MAX_GRID_SIZE) == 11
     )
@@ -100,9 +96,7 @@ def test_default_config_reaches_all_curated_biome_levels_before_ascending():
     highestLevelReached = 1
     level = 1
     for _ in range(20):
-        if shouldAscend(
-            level, config.gridSize, config.minGridSize, config.maxGridSize
-        ):
+        if shouldAscend(level, config.gridSize, config.minGridSize, config.maxGridSize):
             level = 1
         else:
             level += 1
