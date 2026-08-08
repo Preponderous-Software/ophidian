@@ -34,6 +34,45 @@ def test_draw_ui_message_is_a_noop_with_no_pending_message(pygameGame):
     )
 
 
+def _capturedHudText(game, monkeypatch):
+    """Every string drawHud hands to graphik, in draw order.
+
+    The pixel-region assertions elsewhere in this file can only tell that
+    *something* was drawn on a row; the score line's whole point is what it
+    says, so it is captured instead.
+    """
+    drawn = []
+    monkeypatch.setattr(
+        game.graphik,
+        "drawText",
+        lambda text, x, y, size, color: drawn.append(text),
+    )
+    game.drawHud()
+    return drawn
+
+
+def test_draw_hud_renders_the_score(pygameGame, monkeypatch):
+    # regression test: the score was read in three places, none of which the
+    # graphical UI drew, so a player there had no way to see it until the run
+    # ended (see issue #124)
+    game = pygameGame
+    game.saveManager.data["currency"] = 42
+    game.score = 125
+
+    assert "Score: 125 | Currency: 42" in _capturedHudText(game, monkeypatch)
+
+
+def test_draw_hud_annotates_the_score_while_a_multiplier_runs(pygameGame, monkeypatch):
+    # the same annotation the text UI's stats block shows, so a doubled bite
+    # is visible in both UIs rather than only through the power-up countdown
+    game = pygameGame
+    game.saveManager.data["currency"] = 0
+    game.score = 120
+    game.activatePowerUp(PowerUpType.SCORE_MULTIPLIER)
+
+    assert "Score: 120 (x2) | Currency: 0" in _capturedHudText(game, monkeypatch)
+
+
 def test_draw_hud_renders_currency_and_owned_upgrades(pygameGame):
     game = pygameGame
     game.saveManager.data["currency"] = 42

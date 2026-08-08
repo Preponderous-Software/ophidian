@@ -1,6 +1,7 @@
 from scoring.scoring import (
     BASE_POINTS_PER_FOOD,
     applyScoreMultiplier,
+    formatScoreLabel,
     getGridFillPercentage,
     pointsForFood,
 )
@@ -49,3 +50,20 @@ def test_applying_a_multiplier_keeps_the_award_a_whole_number():
     # no renderer should ever have to format a fractional score
     assert applyScoreMultiplier(31, 1.5) == 46
     assert isinstance(applyScoreMultiplier(31, 1.5), int)
+
+
+def test_score_label_annotates_an_active_multiplier():
+    assert formatScoreLabel(120, 2.0) == "120 (x2)"
+
+
+def test_score_label_is_left_unannotated_at_a_neutral_multiplier():
+    assert formatScoreLabel(120, 1.0) == "120"
+
+
+def test_score_label_defaults_to_no_multiplier():
+    assert formatScoreLabel(120) == "120"
+
+
+def test_score_label_keeps_a_fractional_multiplier_readable():
+    # :g so a 1.5x power-up reads "(x1.5)" and a 2x one doesn't read "(x2.0)"
+    assert formatScoreLabel(120, 1.5) == "120 (x1.5)"

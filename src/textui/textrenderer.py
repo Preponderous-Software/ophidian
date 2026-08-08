@@ -5,6 +5,8 @@ import termios
 import tty
 import select
 
+from scoring.scoring import formatScoreLabel
+
 # Windows-specific import
 try:
     import msvcrt
@@ -107,18 +109,16 @@ class TextRenderer:
     def renderStats(self, level, snakeLength, score, percentage, scoreMultiplier=1.0):
         """Render game statistics
 
-        scoreMultiplier arrives as a plain number and is annotated onto the
-        score line here, so the player can tell a doubled bite from a normal
-        one at the moment it is banked rather than only from the power-up's
-        countdown. Defaults to 1.0 (no annotation) so a caller that doesn't
-        care about multipliers is unaffected.
+        scoreMultiplier arrives as a plain number, so the player can tell a
+        doubled bite from a normal one at the moment it is banked rather than
+        only from the power-up's countdown. How it is annotated comes from
+        scoring.formatScoreLabel, which the graphical HUD reads too, so the
+        two UIs cannot disagree about it. Defaults to 1.0 (no annotation) so
+        a caller that doesn't care about multipliers is unaffected.
         """
         print(f"\nLevel: {level}")
         print(f"Length: {snakeLength}")
-        if scoreMultiplier > 1:
-            print(f"Score: {score} (x{scoreMultiplier:g})")
-        else:
-            print(f"Score: {score}")
+        print(f"Score: {formatScoreLabel(score, scoreMultiplier)}")
         print(f"Progress: {int(percentage * 100)}%")
 
         # Draw progress bar

@@ -15,7 +15,12 @@ from powerup.powerup import (
     rollPowerUpType,
 )
 from powerup.active import ActivePowerUps
-from scoring.scoring import applyScoreMultiplier, getGridFillPercentage, pointsForFood
+from scoring.scoring import (
+    applyScoreMultiplier,
+    formatScoreLabel,
+    getGridFillPercentage,
+    pointsForFood,
+)
 from snake.snakePart import SnakePart
 from progression.save import SaveManager
 from progression.obituary import formatObituaryScreen
@@ -175,6 +180,14 @@ class Ophidian:
             multiplier *= getScoreMultiplier(powerUpType)
         return multiplier
 
+    def getScoreLabel(self):
+        """The current score, annotated with any multiplier now running.
+
+        The same string the text UI's stats block shows, so neither UI has to
+        restate when a multiplier is worth annotating.
+        """
+        return formatScoreLabel(self.score, self.getActiveScoreMultiplier())
+
     def displayStatsInConsole(self):
         length = len(self.snakeParts)
         numLocations = len(self.environment.grid.getLocations())
@@ -286,10 +299,16 @@ class Ophidian:
         )
 
     def drawHud(self):
-        """Currency, active-upgrades and active-power-up readout, always
-        visible (not just inside the shop) so the player isn't stuck checking
-        their balance or what they own by reopening the shop mid-run. Drawn
-        just below the banner strip so the two never overlap.
+        """Score, currency, active-upgrades and active-power-up readout,
+        always visible (not just inside the shop) so the player isn't stuck
+        checking their balance or what they own by reopening the shop
+        mid-run. Drawn just below the banner strip so the two never overlap.
+
+        The score shares the first line with the currency rather than taking
+        a line of its own, because graphik centres each string on the x it is
+        given and two centred strings on one row would sit on top of each
+        other. Until it was added here the score was only ever visible in the
+        text UI and in the end-of-run summary (see issue #124).
 
         The optional lines flow upwards into whatever space the ones above
         them left free, so a run with no upgrades owned doesn't render its
@@ -300,7 +319,11 @@ class Ophidian:
         width, _ = self.gameDisplay.get_size()
         currency = self.saveManager.data.get("currency", 0)
         self.graphik.drawText(
-            f"Currency: {currency}", width // 2, 45, 14, self.config.black
+            f"Score: {self.getScoreLabel()} | Currency: {currency}",
+            width // 2,
+            45,
+            14,
+            self.config.black,
         )
         lineY = 63
         labels = self.getActiveUpgradesSummary()

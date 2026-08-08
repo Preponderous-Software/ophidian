@@ -57,8 +57,8 @@ Points are banked as they are earned, one award per piece of food eaten. An awar
 worth a flat 10 points plus one point per percent of the grid the ophidian already
 fills, so bites get more valuable as the board fills up. While the Score Multiplier
 runs, each award is doubled — points earned before it are left alone, and points
-earned after it expires go back to normal. The text UI marks the score line with
-`(x2)` for as long as the multiplier lasts.
+earned after it expires go back to normal. Both UIs mark the score with `(x2)` for
+as long as the multiplier lasts.
 
 Note that the score resets at the start of each level, alongside the board.
 
