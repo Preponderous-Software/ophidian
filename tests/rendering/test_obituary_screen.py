@@ -1,7 +1,9 @@
 from conftest import regionHasNonBackgroundPixel
 
 
-def test_render_obituary_screen_draws_text_over_a_black_overlay(pygameGame, monkeypatch):
+def test_render_obituary_screen_draws_text_over_a_black_overlay(
+    pygameGame, monkeypatch
+):
     game = pygameGame
     monkeypatch.setattr("ophidian.time.sleep", lambda seconds: None)
 

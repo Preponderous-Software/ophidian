@@ -5,6 +5,8 @@ import termios
 import tty
 import select
 
+from scoring.scoring import formatScoreLabel
+
 # Windows-specific import
 try:
     import msvcrt
@@ -20,21 +22,21 @@ class TextRenderer:
         self.old_settings = None
 
     def clearScreen(self):
-        os.system('clear' if os.name != 'nt' else 'cls')
+        os.system("clear" if os.name != "nt" else "cls")
 
     def renderGrid(self, environment, snakeParts, collision):
         """Render the game grid as text"""
         self.clearScreen()
-        
+
         grid = environment.getGrid()
         rows = grid.getRows()
         cols = grid.getColumns()
-        
+
         # Create a display grid
         display = []
         for _ in range(cols):
-            display.append(['.'] * rows)
-        
+            display.append(["."] * rows)
+
         # Mark snake parts
         for snakePart in snakeParts:
             locationID = snakePart.getLocationID()
@@ -42,8 +44,8 @@ class TextRenderer:
                 location = grid.getLocation(locationID)
                 x = location.getX()
                 y = location.getY()
-                display[y][x] = 'S'
-        
+                display[y][x] = "S"
+
         # Mark head of snake
         if len(snakeParts) > 0:
             headLocationID = snakeParts[0].getLocationID()
@@ -51,8 +53,8 @@ class TextRenderer:
                 headLocation = grid.getLocation(headLocationID)
                 hx = headLocation.getX()
                 hy = headLocation.getY()
-                display[hy][hx] = 'H'
-        
+                display[hy][hx] = "H"
+
         # Mark food and power-ups. A power-up supplies its own symbol and
         # display name (the way Food already supplies its color), so this
         # renderer stays independent of the power-up registry and needs no
@@ -65,25 +67,25 @@ class TextRenderer:
                 x = location.getX()
                 y = location.getY()
                 if entity.getName() == "Food":
-                    display[y][x] = 'F'
+                    display[y][x] = "F"
                 elif entity.getName() == "PowerUp":
                     symbol = entity.getTextSymbol()
                     display[y][x] = symbol
                     powerUpLegend[symbol] = entity.getDisplayName()
 
         # Print border
-        print('┌' + '─' * (rows * 2 + 1) + '┐')
-        
+        print("┌" + "─" * (rows * 2 + 1) + "┐")
+
         # Print grid
         for row in display:
-            print('│ ' + ' '.join(row) + ' │')
-        
+            print("│ " + " ".join(row) + " │")
+
         # Print border
-        print('└' + '─' * (rows * 2 + 1) + '┘')
-        
+        print("└" + "─" * (rows * 2 + 1) + "┘")
+
         if collision:
             print("\n[!] COLLISION! The ophidian collides with itself!")
-        
+
         # power-up entries are built from what is actually on the board, so
         # the legend can never advertise a symbol the player can't see
         legendEntries = ["H=Head", "S=Snake", "F=Food"]
@@ -107,24 +109,22 @@ class TextRenderer:
     def renderStats(self, level, snakeLength, score, percentage, scoreMultiplier=1.0):
         """Render game statistics
 
-        scoreMultiplier arrives as a plain number and is annotated onto the
-        score line here, so the player can tell a doubled bite from a normal
-        one at the moment it is banked rather than only from the power-up's
-        countdown. Defaults to 1.0 (no annotation) so a caller that doesn't
-        care about multipliers is unaffected.
+        scoreMultiplier arrives as a plain number, so the player can tell a
+        doubled bite from a normal one at the moment it is banked rather than
+        only from the power-up's countdown. How it is annotated comes from
+        scoring.formatScoreLabel, which the graphical HUD reads too, so the
+        two UIs cannot disagree about it. Defaults to 1.0 (no annotation) so
+        a caller that doesn't care about multipliers is unaffected.
         """
         print(f"\nLevel: {level}")
         print(f"Length: {snakeLength}")
-        if scoreMultiplier > 1:
-            print(f"Score: {score} (x{scoreMultiplier:g})")
-        else:
-            print(f"Score: {score}")
+        print(f"Score: {formatScoreLabel(score, scoreMultiplier)}")
         print(f"Progress: {int(percentage * 100)}%")
-        
+
         # Draw progress bar
         bar_length = 30
         filled = int(bar_length * percentage)
-        bar = '█' * filled + '░' * (bar_length - filled)
+        bar = "█" * filled + "░" * (bar_length - filled)
         print(f"[{bar}]")
 
     def renderHud(self, currency, activeUpgradeLabels, powerUpStatuses=None):
@@ -154,13 +154,13 @@ class TextRenderer:
 
     def enableRawMode(self):
         """Enable raw mode for non-blocking keyboard input"""
-        if os.name != 'nt':
+        if os.name != "nt":
             self.old_settings = termios.tcgetattr(sys.stdin)
             tty.setcbreak(sys.stdin.fileno())
 
     def disableRawMode(self):
         """Disable raw mode and restore terminal settings"""
-        if os.name != 'nt' and self.old_settings:
+        if os.name != "nt" and self.old_settings:
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
 
     def getKeyPress(self, timeout=0):
@@ -169,20 +169,20 @@ class TextRenderer:
         Returns the key pressed or None if no key was pressed
         Handles arrow keys by reading full escape sequences
         """
-        if os.name != 'nt':
+        if os.name != "nt":
             # Unix/Linux/Mac
             if select.select([sys.stdin], [], [], timeout)[0]:
                 ch = sys.stdin.read(1)
                 # Check if this is the start of an escape sequence
-                if ch == '\x1b':
+                if ch == "\x1b":
                     # Try to read the rest of the arrow key sequence
                     if select.select([sys.stdin], [], [], 0.01)[0]:
                         ch2 = sys.stdin.read(1)
-                        if ch2 == '[':
+                        if ch2 == "[":
                             if select.select([sys.stdin], [], [], 0.01)[0]:
                                 ch3 = sys.stdin.read(1)
                                 # Return full escape sequence
-                                return '\x1b[' + ch3
+                                return "\x1b[" + ch3
                     return ch
                 return ch
         else:
@@ -190,15 +190,15 @@ class TextRenderer:
             if msvcrt and msvcrt.kbhit():
                 ch = msvcrt.getch()
                 # Handle arrow keys on Windows
-                if ch in (b'\xe0', b'\x00'):
+                if ch in (b"\xe0", b"\x00"):
                     ch2 = msvcrt.getch()
                     # Map Windows arrow keys to escape sequences
                     arrow_map = {
-                        b'H': '\x1b[A',  # Up
-                        b'P': '\x1b[B',  # Down
-                        b'M': '\x1b[C',  # Right
-                        b'K': '\x1b[D',  # Left
+                        b"H": "\x1b[A",  # Up
+                        b"P": "\x1b[B",  # Down
+                        b"M": "\x1b[C",  # Right
+                        b"K": "\x1b[D",  # Left
                     }
-                    return arrow_map.get(ch2, ch2.decode('utf-8', errors='ignore'))
-                return ch.decode('utf-8', errors='ignore')
+                    return arrow_map.get(ch2, ch2.decode("utf-8", errors="ignore"))
+                return ch.decode("utf-8", errors="ignore")
         return None

@@ -49,3 +49,18 @@ def applyScoreMultiplier(points, multiplier):
     power-up declares, so no renderer has to format a fractional score.
     """
     return int(points * multiplier)
+
+
+def formatScoreLabel(score, multiplier=1.0):
+    """A score with its active multiplier annotated, e.g. "120 (x2)".
+
+    One rule shared by both UIs, the way progression/shop.py owns its
+    upgrade labels: the graphical HUD and the text UI's stats block would
+    otherwise each spell out when and how a multiplier is annotated, which
+    is how the two have drifted apart before (see issues #124 and #73). A
+    neutral multiplier annotates nothing, so a run with no multiplier
+    running reads exactly as it did before power-ups existed.
+    """
+    if multiplier > 1:
+        return f"{score} (x{multiplier:g})"
+    return str(score)
