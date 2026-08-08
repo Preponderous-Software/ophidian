@@ -45,7 +45,7 @@ def _capturedHudText(game, monkeypatch):
     monkeypatch.setattr(
         game.graphik,
         "drawText",
-        lambda text, x, y, size, color: drawn.append(text),
+        lambda text, *args: drawn.append(text),
     )
     game.drawHud()
     return drawn
