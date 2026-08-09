@@ -2,7 +2,26 @@ import time
 
 from conftest import regionHasNonBackgroundPixel
 
-from powerup.powerup import PowerUpType, getPowerUpDurationSeconds
+from ophidian import POWER_UP_INDICATOR_METER_WIDTH
+from powerup.powerup import (
+    PowerUpType,
+    getPowerUpDefinition,
+    getPowerUpDurationSeconds,
+)
+
+
+def _meterSamplePoints(surface):
+    """The x of each end of a first power-up indicator's meter, and its y.
+
+    Derived from the drawn geometry rather than restated as pixel literals,
+    so moving the meter fails these tests where it moved instead of as an
+    unexplained color mismatch. The first indicator's label sits on the row
+    the upgrades line would have taken (63) when no upgrades are owned, and
+    drawPowerUpIndicator puts the meter 9px below that.
+    """
+    width, _ = surface.get_size()
+    meterLeft = width // 2 - POWER_UP_INDICATOR_METER_WIDTH // 2
+    return meterLeft + 1, meterLeft + POWER_UP_INDICATOR_METER_WIDTH - 2, 63 + 9 + 1
 
 
 def test_draw_ui_message_renders_notify_banner(pygameGame):
@@ -168,13 +187,12 @@ def test_draw_hud_draws_a_duration_meter_under_each_power_up_label(pygameGame):
 
     game.drawHud()
 
-    width, _ = surface.get_size()
     # a freshly activated power-up fills its whole meter, so both ends of
     # the track carry the power-up's own color rather than the empty gray
-    meterY = 63 + 9 + 1
-    meterLeft = width // 2 - 70
-    assert tuple(surface.get_at((meterLeft + 1, meterY)))[:3] == (0, 0, 255)
-    assert tuple(surface.get_at((meterLeft + 138, meterY)))[:3] == (0, 0, 255)
+    startX, endX, meterY = _meterSamplePoints(surface)
+    speedColor = getPowerUpDefinition(PowerUpType.SPEED)["color"]
+    assert tuple(surface.get_at((startX, meterY)))[:3] == speedColor
+    assert tuple(surface.get_at((endX, meterY)))[:3] == speedColor
 
 
 def test_draw_hud_drains_the_duration_meter_as_a_power_up_runs_out(
@@ -192,13 +210,12 @@ def test_draw_hud_drains_the_duration_meter_as_a_power_up_runs_out(
 
     game.drawHud()
 
-    width, _ = surface.get_size()
-    meterY = 63 + 9 + 1
-    meterLeft = width // 2 - 70
     # a quarter of the duration left: the left end is still filled, and the
     # far end has fallen back to the empty track
-    assert tuple(surface.get_at((meterLeft + 1, meterY)))[:3] == (0, 0, 255)
-    assert tuple(surface.get_at((meterLeft + 138, meterY)))[:3] == game.config.gray
+    startX, endX, meterY = _meterSamplePoints(surface)
+    speedColor = getPowerUpDefinition(PowerUpType.SPEED)["color"]
+    assert tuple(surface.get_at((startX, meterY)))[:3] == speedColor
+    assert tuple(surface.get_at((endX, meterY)))[:3] == game.config.gray
 
 
 def test_draw_hud_omits_power_up_line_when_none_is_running(pygameGame):

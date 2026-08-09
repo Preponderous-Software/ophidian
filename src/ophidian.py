@@ -866,10 +866,10 @@ class Ophidian:
         snake spent the tail of every boost moving faster for reasons the
         player could no longer see (see issue #114).
 
-        Each record carries only plain data - the symbol and color the power
-        -up is already recognized by on the grid, the seconds left as a
-        number, and how much of the duration those seconds are as a fraction
-        of one. Nothing is pre-formatted, so each renderer presents an
+        Each record carries only plain data - the symbol and color that the
+        power-up is already recognized by on the grid, the seconds left as
+        a number, and how much of the duration those seconds are as a
+        fraction of one. Nothing is pre-formatted, so each renderer presents an
         indicator in its own idiom (a drawn meter, an ASCII one) and gameplay
         code stays out of the UI. Both loops already call updatePowerUps()
         once per iteration, so the values are naturally fresh with no extra

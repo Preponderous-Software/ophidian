@@ -162,8 +162,13 @@ class TextRenderer:
         so the two read as the same kind of gauge. Drawn from the fraction
         rather than the whole seconds printed beside it, which is what lets a
         long power-up show progress between the seconds ticking over.
+
+        The cell count is clamped rather than trusted: gameplay already keeps
+        the fraction within 0..1, but a value outside it would otherwise make
+        the empty half of the bar collapse to nothing and quietly change the
+        bar's width.
         """
-        filled = int(cells * fractionRemaining)
+        filled = max(0, min(cells, int(cells * fractionRemaining)))
         return "[" + "█" * filled + "░" * (cells - filled) + "]"
 
     def renderControls(self):
