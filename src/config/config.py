@@ -17,6 +17,9 @@ class Config:
         self.red = (255, 0, 0)
         self.blue = (0, 0, 255)
         self.yellow = (255, 255, 0)
+        # the unfilled track of a HUD meter: light enough to read as "empty"
+        # against the white background without disappearing into it
+        self.gray = (180, 180, 180)
         self.textSize = 50
 
         # grid size

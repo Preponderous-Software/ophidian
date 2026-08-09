@@ -14,6 +14,12 @@ except ImportError:
     msvcrt = None
 
 
+# Width, in characters, of a power-up's duration meter. Narrower than the
+# level-progress bar in renderStats so several indicators can sit on their
+# own lines beside their labels without wrapping a normal terminal.
+POWER_UP_METER_CELLS = 10
+
+
 # @author Daniel McCoy Stephenson
 # @since October 15th, 2025
 class TextRenderer:
@@ -132,18 +138,38 @@ class TextRenderer:
         visible (not just inside the shop) so the player isn't stuck checking
         their balance or what they own by reopening the shop mid-run.
 
-        powerUpStatuses is a list of (label, secondsRemaining) pairs whose
-        seconds arrive as plain numbers and are formatted here, mirroring
-        renderMessage's already-resolved string so this renderer stays
-        independent of both the graphical UI package and the power-up
-        registry. Gameplay omits power-ups with no time left, so every pair
-        handed over is worth a line.
+        powerUpStatuses is a list of indicator records carrying plain data
+        (symbol, label, seconds left, fraction of the duration left) which is
+        formatted here, mirroring renderMessage's already-resolved string so
+        this renderer stays independent of both the graphical UI package and
+        the power-up registry. Gameplay omits power-ups with no time left, so
+        every record handed over is worth a line.
         """
         print(f"Currency: {currency}")
         if activeUpgradeLabels:
             print("Active upgrades: " + ", ".join(activeUpgradeLabels))
-        for label, secondsRemaining in powerUpStatuses or []:
-            print(f"{label}: {math.ceil(secondsRemaining)}s")
+        for status in powerUpStatuses or []:
+            meter = self.formatDurationMeter(status["fractionRemaining"])
+            print(
+                f"[{status['symbol']}] {status['label']}: "
+                f"{math.ceil(status['secondsRemaining'])}s {meter}"
+            )
+
+    def formatDurationMeter(self, fractionRemaining, cells=POWER_UP_METER_CELLS):
+        """A power-up's remaining duration as a bar of filled/empty cells.
+
+        The same block characters the level-progress bar in renderStats uses,
+        so the two read as the same kind of gauge. Drawn from the fraction
+        rather than the whole seconds printed beside it, which is what lets a
+        long power-up show progress between the seconds ticking over.
+
+        The cell count is clamped rather than trusted: gameplay already keeps
+        the fraction within 0..1, but a value outside it would otherwise make
+        the empty half of the bar collapse to nothing and quietly change the
+        bar's width.
+        """
+        filled = max(0, min(cells, int(cells * fractionRemaining)))
+        return "[" + "█" * filled + "░" * (cells - filled) + "]"
 
     def renderControls(self):
         """Render control instructions"""

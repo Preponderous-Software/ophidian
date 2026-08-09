@@ -1,8 +1,15 @@
+import pytest
+
 from textui.textrenderer import TextRenderer
 
 from food.food import Food, FOOD_TYPE_GROWTH
 from ophidian import Ophidian
-from powerup.powerup import PowerUp, PowerUpType, getPowerUpDefinition
+from powerup.powerup import (
+    PowerUp,
+    PowerUpType,
+    getPowerUpDefinition,
+    getPowerUpDurationSeconds,
+)
 from scoring.scoring import pointsForFood
 from snake.snakePart import SnakePart
 
@@ -171,7 +178,9 @@ def test_the_running_multiplier_is_listed_on_both_huds(tmp_path, monkeypatch):
     endTime = game.activePowerUps.expiresAt[PowerUpType.SCORE_MULTIPLIER]
     monkeypatch.setattr("powerup.active.time.time", lambda: endTime - 4)
 
-    assert game.getActivePowerUpStatuses() == [("Double points", 4)]
+    (status,) = game.getActivePowerUpStatuses()
+    assert status["label"] == "Double points"
+    assert status["secondsRemaining"] == 4
 
 
 def test_collecting_an_invincibility_power_up_starts_it(tmp_path, monkeypatch):
@@ -255,7 +264,56 @@ def test_active_power_up_statuses_count_down_while_running(tmp_path, monkeypatch
     endTime = game.activePowerUps.expiresAt[PowerUpType.SPEED]
     monkeypatch.setattr("powerup.active.time.time", lambda: endTime - 3)
 
-    assert game.getActivePowerUpStatuses() == [("Speed boost", 3)]
+    (status,) = game.getActivePowerUpStatuses()
+    assert status["label"] == "Speed boost"
+    assert status["secondsRemaining"] == 3
+
+
+def test_active_power_up_statuses_identify_the_type_by_symbol_and_color(
+    tmp_path, monkeypatch
+):
+    # the symbol and color a power-up was collected in on the grid, so an
+    # indicator is recognizable as that power-up (issue #72)
+    game = _makeGame(monkeypatch, tmp_path)
+
+    game.activatePowerUp(PowerUpType.SPEED)
+
+    (status,) = game.getActivePowerUpStatuses()
+    definition = getPowerUpDefinition(PowerUpType.SPEED)
+    assert status["symbol"] == definition["textSymbol"]
+    assert status["color"] == definition["color"]
+
+
+def test_active_power_up_statuses_report_the_fraction_of_duration_left(
+    tmp_path, monkeypatch
+):
+    # what drives the duration meters both HUDs draw: it falls continuously
+    # between whole seconds, so an expiring power-up drains smoothly
+    game = _makeGame(monkeypatch, tmp_path)
+    duration = getPowerUpDurationSeconds(PowerUpType.SPEED)
+
+    game.activatePowerUp(PowerUpType.SPEED)
+    endTime = game.activePowerUps.expiresAt[PowerUpType.SPEED]
+    monkeypatch.setattr("powerup.active.time.time", lambda: endTime - duration / 4)
+
+    (status,) = game.getActivePowerUpStatuses()
+    assert status["durationSeconds"] == duration
+    assert status["fractionRemaining"] == pytest.approx(0.25)
+
+
+def test_refreshing_a_power_up_returns_its_meter_to_full(tmp_path, monkeypatch):
+    # collecting one that is already running extends the timer to a full
+    # duration, so the fraction must go back to 1 rather than past it
+    game = _makeGame(monkeypatch, tmp_path)
+    duration = getPowerUpDurationSeconds(PowerUpType.SPEED)
+
+    game.activatePowerUp(PowerUpType.SPEED)
+    endTime = game.activePowerUps.expiresAt[PowerUpType.SPEED]
+    monkeypatch.setattr("powerup.active.time.time", lambda: endTime - duration / 4)
+    game.activatePowerUp(PowerUpType.SPEED)
+
+    (status,) = game.getActivePowerUpStatuses()
+    assert status["fractionRemaining"] == 1.0
 
 
 def test_active_power_up_statuses_omit_one_with_no_time_left(tmp_path, monkeypatch):

@@ -48,9 +48,12 @@ Speed Boost | the ophidian moves twice as fast | 5s | 15%
 Invincibility | collisions with your own body no longer end the run | 3s | 5%
 Score Multiplier | food is worth double points | 10s | 15%
 
-Whatever is currently running is listed on the HUD with its remaining time, in both
-UIs. In the text UI, power-ups appear on the grid as their own symbol and are listed
-in the legend beneath it.
+Whatever is currently running gets its own indicator on the HUD, in both UIs: the
+symbol the power-up is drawn with on the grid, its name, the whole seconds left, and
+a meter that drains as its timer does. The graphical UI fills that meter with the
+power-up's own color; the text UI draws it as `[██████░░░░]`. In the text UI,
+power-ups appear on the grid as their own symbol and are listed in the legend
+beneath it.
 
 ## Scoring
 Points are banked as they are earned, one award per piece of food eaten. An award is
