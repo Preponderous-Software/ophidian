@@ -8,9 +8,11 @@ from food.food import Food, FOOD_TYPE_GROWTH
 from powerup.powerup import (
     PowerUp,
     PowerUpType,
+    getPowerUpColor,
     getPowerUpDefinition,
     getPowerUpDurationSeconds,
     getPowerUpHudLabel,
+    getPowerUpTextSymbol,
     getScoreMultiplier,
     rollPowerUpType,
 )
@@ -44,6 +46,15 @@ from progression.ascension import (
 )
 from ui.banner import UiBanner
 from ui.shop_screen import PygameShopScreen
+
+
+# Geometry of one power-up indicator in the graphical HUD: a label row with
+# a duration meter tucked underneath it. The row is taller than the plain
+# text rows above it because it carries the meter as well, so the rows of a
+# stack of indicators don't collide.
+POWER_UP_INDICATOR_ROW_HEIGHT = 24
+POWER_UP_INDICATOR_METER_WIDTH = 140
+POWER_UP_INDICATOR_METER_HEIGHT = 4
 
 
 # @author Daniel McCoy Stephenson
@@ -332,18 +343,52 @@ class Ophidian:
                 " | ".join(labels), width // 2, lineY, 12, self.config.black
             )
             lineY += 18
-        # one line per running power-up. Remaining seconds arrive as plain
-        # numbers and are formatted here, so gameplay stays out of the UI and
-        # each renderer presents them in its own idiom.
-        for label, secondsRemaining in self.getActivePowerUpStatuses():
-            self.graphik.drawText(
-                f"{label}: {math.ceil(secondsRemaining)}s",
-                width // 2,
-                lineY,
-                12,
-                self.config.black,
+        for status in self.getActivePowerUpStatuses():
+            self.drawPowerUpIndicator(status, width // 2, lineY)
+            lineY += POWER_UP_INDICATOR_ROW_HEIGHT
+
+    def drawPowerUpIndicator(self, status, centerX, centerY):
+        """One power-up's indicator: symbol, label, seconds left, and a meter
+        that drains as its timer does.
+
+        The status record arrives as plain numbers from gameplay and is
+        formatted here, so each renderer presents an indicator in its own
+        idiom. The meter is drawn from fractionRemaining rather than from the
+        rounded-up seconds beside it, which is what makes an expiring
+        power-up drain smoothly instead of stepping down once a second, and
+        what makes a refreshed timer visibly jump back to full.
+
+        The filled portion takes the power-up's own color - the same one it
+        was collected in on the grid - so which of several stacked
+        indicators is running out is readable without stopping to read the
+        labels.
+        """
+        self.graphik.drawText(
+            f"[{status['symbol']}] {status['label']}: "
+            f"{math.ceil(status['secondsRemaining'])}s",
+            centerX,
+            centerY,
+            12,
+            self.config.black,
+        )
+        meterX = centerX - POWER_UP_INDICATOR_METER_WIDTH // 2
+        meterY = centerY + 9
+        self.graphik.drawRectangle(
+            meterX,
+            meterY,
+            POWER_UP_INDICATOR_METER_WIDTH,
+            POWER_UP_INDICATOR_METER_HEIGHT,
+            self.config.gray,
+        )
+        filledWidth = int(POWER_UP_INDICATOR_METER_WIDTH * status["fractionRemaining"])
+        if filledWidth > 0:
+            self.graphik.drawRectangle(
+                meterX,
+                meterY,
+                filledWidth,
+                POWER_UP_INDICATOR_METER_HEIGHT,
+                status["color"],
             )
-            lineY += 18
 
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
@@ -814,23 +859,46 @@ class Ophidian:
             self.notify(getPowerUpDefinition(powerUpType)["expiryMessage"])
 
     def getActivePowerUpStatuses(self):
-        """[(label, secondsRemaining)] for every power-up currently running.
+        """One indicator record per power-up currently running.
 
         A power-up's activation banner expires after UiBanner.durationSeconds
         (2s) while the power-up itself can last longer, so without this the
         snake spent the tail of every boost moving faster for reasons the
         player could no longer see (see issue #114).
 
-        Seconds come back as plain numbers rather than display strings so
-        each renderer formats them in its own idiom and gameplay code stays
-        out of the UI. Both loops already call updatePowerUps() once per
-        iteration, so the values are naturally fresh with no extra
+        Each record carries only plain data - the symbol and color the power
+        -up is already recognized by on the grid, the seconds left as a
+        number, and how much of the duration those seconds are as a fraction
+        of one. Nothing is pre-formatted, so each renderer presents an
+        indicator in its own idiom (a drawn meter, an ASCII one) and gameplay
+        code stays out of the UI. Both loops already call updatePowerUps()
+        once per iteration, so the values are naturally fresh with no extra
         bookkeeping.
+
+        fractionRemaining is what makes the countdown read smoothly: it
+        falls continuously across frames, where the whole seconds beside it
+        only change once a second. Clamped to at most 1 because collecting a
+        power-up that is already running refreshes its timer to a full
+        duration.
         """
-        return [
-            (getPowerUpHudLabel(powerUpType), secondsRemaining)
-            for powerUpType, secondsRemaining in self.activePowerUps.statuses()
-        ]
+        statuses = []
+        for powerUpType, secondsRemaining in self.activePowerUps.statuses():
+            durationSeconds = getPowerUpDurationSeconds(powerUpType)
+            statuses.append(
+                {
+                    "label": getPowerUpHudLabel(powerUpType),
+                    "symbol": getPowerUpTextSymbol(powerUpType),
+                    "color": getPowerUpColor(powerUpType),
+                    "secondsRemaining": secondsRemaining,
+                    "durationSeconds": durationSeconds,
+                    "fractionRemaining": (
+                        min(1.0, secondsRemaining / durationSeconds)
+                        if durationSeconds > 0
+                        else 0.0
+                    ),
+                }
+            )
+        return statuses
 
     def resolveSelectedCosmeticColor(self):
         # Falls back to the original random-color behavior for "default"

@@ -113,6 +113,26 @@ def getPowerUpDurationSeconds(powerUpType):
     return getPowerUpDefinition(powerUpType)["durationSeconds"]
 
 
+def getPowerUpColor(powerUpType):
+    """The color a power-up is identified by, on the grid and on the HUD.
+
+    Read through here rather than off a PowerUp entity, because the HUD has
+    to identify a power-up that is running - by which point the entity that
+    granted it has already been removed from the board.
+    """
+    return getPowerUpDefinition(powerUpType)["color"]
+
+
+def getPowerUpTextSymbol(powerUpType):
+    """The single character a power-up is identified by.
+
+    Shared by the grid glyph the text UI draws and the HUD indicator both
+    UIs draw, so a power-up is recognized by the same symbol wherever it
+    appears.
+    """
+    return getPowerUpDefinition(powerUpType)["textSymbol"]
+
+
 def getScoreMultiplier(powerUpType):
     """How much a power-up scales points earned while it runs.
 

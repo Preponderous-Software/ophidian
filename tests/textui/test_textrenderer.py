@@ -152,24 +152,68 @@ def test_render_hud_omits_upgrades_line_when_none_active(renderer, capsys):
     assert "Active upgrades" not in out
 
 
+def _powerUpStatus(label, secondsRemaining, symbol=">", fractionRemaining=1.0):
+    """One indicator record shaped like Ophidian.getActivePowerUpStatuses'."""
+    return {
+        "label": label,
+        "symbol": symbol,
+        "color": (0, 0, 255),
+        "secondsRemaining": secondsRemaining,
+        "durationSeconds": 5.0,
+        "fractionRemaining": fractionRemaining,
+    }
+
+
 def test_render_hud_shows_remaining_power_up_time_rounded_up(renderer, capsys):
     renderer.renderHud(
-        currency=0, activeUpgradeLabels=[], powerUpStatuses=[("Speed boost", 2.4)]
+        currency=0,
+        activeUpgradeLabels=[],
+        powerUpStatuses=[_powerUpStatus("Speed boost", 2.4)],
     )
 
     assert "Speed boost: 3s" in capsys.readouterr().out
+
+
+def test_render_hud_marks_each_power_up_with_its_symbol(renderer, capsys):
+    # the same symbol the power-up is drawn with on the grid, so an
+    # indicator is recognizable as that power-up (issue #72)
+    renderer.renderHud(
+        currency=0,
+        activeUpgradeLabels=[],
+        powerUpStatuses=[_powerUpStatus("Double points", 4.0, symbol="x")],
+    )
+
+    assert "[x] Double points: 4s" in capsys.readouterr().out
+
+
+def test_render_hud_draws_a_duration_meter_for_each_power_up(renderer, capsys):
+    renderer.renderHud(
+        currency=0,
+        activeUpgradeLabels=[],
+        powerUpStatuses=[_powerUpStatus("Speed boost", 2.4, fractionRemaining=0.5)],
+    )
+
+    assert "[█████░░░░░]" in capsys.readouterr().out
 
 
 def test_render_hud_lists_every_active_power_up(renderer, capsys):
     renderer.renderHud(
         currency=0,
         activeUpgradeLabels=[],
-        powerUpStatuses=[("Speed boost", 2.4), ("Invincible", 1.1)],
+        powerUpStatuses=[
+            _powerUpStatus("Speed boost", 2.4),
+            _powerUpStatus("Invincible", 1.1, symbol="*"),
+        ],
     )
 
     out = capsys.readouterr().out
     assert "Speed boost: 3s" in out
     assert "Invincible: 2s" in out
+
+
+def test_format_duration_meter_is_full_at_the_start_and_empty_at_the_end(renderer):
+    assert renderer.formatDurationMeter(1.0) == "[" + "█" * 10 + "]"
+    assert renderer.formatDurationMeter(0.0) == "[" + "░" * 10 + "]"
 
 
 def test_render_hud_omits_power_up_lines_when_none_are_running(renderer, capsys):
