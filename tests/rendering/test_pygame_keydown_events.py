@@ -1,5 +1,47 @@
 import pygame
 
+from controls.keybindings import buildPygameActionKeys, buildPygameDirectionKeys
+
+
+def test_pygame_key_tables_are_built_from_real_pygame_key_codes():
+    # the fake pygame in tests/controls/test_keybindings.py proves the
+    # shape of these tables but not that the attribute names exist; this
+    # is what would catch a mistyped K_ name
+    directionKeys = buildPygameDirectionKeys(pygame)
+    actionKeys = buildPygameActionKeys(pygame)
+
+    assert set(directionKeys) == {
+        pygame.K_w,
+        pygame.K_a,
+        pygame.K_s,
+        pygame.K_d,
+        pygame.K_UP,
+        pygame.K_LEFT,
+        pygame.K_DOWN,
+        pygame.K_RIGHT,
+    }
+    assert set(actionKeys) == {
+        pygame.K_q,
+        pygame.K_l,
+        pygame.K_r,
+        pygame.K_c,
+        pygame.K_p,
+        pygame.K_F11,
+    }
+
+
+def test_pygame_unbound_key_is_ignored(pygameGame):
+    game = pygameGame
+    game.selectedSnakePart.setDirection(3)
+    game.changedDirectionThisTick = False
+    game.running = True
+
+    assert game.handleKeyDownEvent(pygame.K_z) is None
+
+    assert game.selectedSnakePart.getDirection() == 3
+    assert game.changedDirectionThisTick == False
+    assert game.running == True
+
 
 def test_pygame_direction_keys_set_direction_and_guard_against_reversal(pygameGame):
     game = pygameGame
