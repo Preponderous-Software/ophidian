@@ -46,6 +46,20 @@ from progression.ascension import (
 )
 from ui.banner import UiBanner
 from ui.shop_screen import PygameShopScreen
+from controls.keybindings import (
+    ACTION_CYCLE_COSMETIC,
+    ACTION_OPEN_SHOP,
+    ACTION_QUIT,
+    ACTION_RESTART_RUN,
+    ACTION_TOGGLE_FULLSCREEN,
+    ACTION_TOGGLE_TICK_SPEED_LIMIT,
+    OPPOSITE_DIRECTIONS,
+    RESTART_SENTINEL,
+    TEXT_UI_ACTION_KEYS,
+    TEXT_UI_DIRECTION_KEYS,
+    buildPygameActionKeys,
+    buildPygameDirectionKeys,
+)
 
 
 # Geometry of one power-up indicator in the graphical HUD: a label row with
@@ -82,6 +96,7 @@ class Ophidian:
             self.textRenderer = TextRenderer(self.config)
             self.textRenderer.enableRawMode()
 
+        self.initializeKeyBindings()
         self.saveManager = SaveManager()
         if self.saveManager.data["ophidianName"] is None:
             self.saveManager.data["ophidianName"] = generateOphidianName()
@@ -621,104 +636,74 @@ class Ophidian:
             self.quitApplication,
         ).run()
 
-    def handleKeyDownEvent(self, key):
-        # For text UI, key is a character; for pygame, it's a key code
+    def initializeKeyBindings(self):
+        """Builds this run's key tables for whichever UI is in use.
+
+        Only the spelling of a key differs between the two UIs, so this is
+        the one place either of them is consulted; every rule the keys
+        trigger lives once, below.
+        """
         if self.config.useTextUI:
-            # Text UI key handling
-            if key == "q":
-                self.running = False
-            elif key == "w" or key == "\x1b[A":  # w or up arrow
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 2
-                ):
-                    self.selectedSnakePart.setDirection(0)
-                    self.changedDirectionThisTick = True
-            elif key == "a" or key == "\x1b[D":  # a or left arrow
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 3
-                ):
-                    self.selectedSnakePart.setDirection(1)
-                    self.changedDirectionThisTick = True
-            elif key == "s" or key == "\x1b[B":  # s or down arrow
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 0
-                ):
-                    self.selectedSnakePart.setDirection(2)
-                    self.changedDirectionThisTick = True
-            elif key == "d" or key == "\x1b[C":  # d or right arrow
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 1
-                ):
-                    self.selectedSnakePart.setDirection(3)
-                    self.changedDirectionThisTick = True
-            elif key == "l":
-                if self.config.limitTickSpeed:
-                    self.config.limitTickSpeed = False
-                else:
-                    self.config.limitTickSpeed = True
-            elif key == "r":
-                self.restartRun()
-                return "restart"
-            elif key == "c":
-                self.cycleSelectedCosmetic()
-            elif key == "p":
-                self.openShop()
-                return "restart"
+            self.directionKeys = dict(TEXT_UI_DIRECTION_KEYS)
+            self.actionKeys = dict(TEXT_UI_ACTION_KEYS)
         else:
-            # Pygame key handling
-            if key == self.pygame.K_q:
-                self.running = False
-            elif key == self.pygame.K_w or key == self.pygame.K_UP:
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 2
-                ):
-                    self.selectedSnakePart.setDirection(0)
-                    self.changedDirectionThisTick = True
-            elif key == self.pygame.K_a or key == self.pygame.K_LEFT:
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 3
-                ):
-                    self.selectedSnakePart.setDirection(1)
-                    self.changedDirectionThisTick = True
-            elif key == self.pygame.K_s or key == self.pygame.K_DOWN:
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 0
-                ):
-                    self.selectedSnakePart.setDirection(2)
-                    self.changedDirectionThisTick = True
-            elif key == self.pygame.K_d or key == self.pygame.K_RIGHT:
-                if (
-                    self.changedDirectionThisTick == False
-                    and self.selectedSnakePart.getDirection() != 1
-                ):
-                    self.selectedSnakePart.setDirection(3)
-                    self.changedDirectionThisTick = True
-            elif key == self.pygame.K_F11:
-                if self.config.fullscreen:
-                    self.config.fullscreen = False
-                else:
-                    self.config.fullscreen = True
-                self.initializeGameDisplay()
-            elif key == self.pygame.K_l:
-                if self.config.limitTickSpeed:
-                    self.config.limitTickSpeed = False
-                else:
-                    self.config.limitTickSpeed = True
-            elif key == self.pygame.K_r:
-                self.restartRun()
-                return "restart"
-            elif key == self.pygame.K_c:
-                self.cycleSelectedCosmetic()
-            elif key == self.pygame.K_p:
-                self.openShop()
-                return "restart"
+            self.directionKeys = buildPygameDirectionKeys(self.pygame)
+            self.actionKeys = buildPygameActionKeys(self.pygame)
+
+    def handleKeyDownEvent(self, key):
+        """Turns one key press into the gameplay rule it stands for.
+
+        Both run loops call this - the key is a character in text mode and
+        a pygame key code in graphical mode, and the tables built by
+        initializeKeyBindings() are the only part that knows the
+        difference. Keys bound to nothing are ignored.
+
+        Returns RESTART_SENTINEL when the press left a board that must not
+        be advanced in the same frame; both loops have to honour that
+        identically (issue #117).
+        """
+        if key in self.directionKeys:
+            self.setDirectionIfAllowed(self.directionKeys[key])
+            return None
+        action = self.actionKeys.get(key)
+        if action is None:
+            return None
+        return self.performAction(action)
+
+    def setDirectionIfAllowed(self, direction):
+        """Turns the snake, unless the turn is one of the two that are not
+        allowed: reversing into its own neck, or a second turn in a tick
+        the snake has already turned in (which would otherwise let two keys
+        pressed between ticks add up to a reversal).
+        """
+        if self.changedDirectionThisTick:
+            return
+        if self.selectedSnakePart.getDirection() == OPPOSITE_DIRECTIONS[direction]:
+            return
+        self.selectedSnakePart.setDirection(direction)
+        self.changedDirectionThisTick = True
+
+    def performAction(self, action):
+        """Carries out one non-directional action, whichever UI its key was
+        pressed in. Returns RESTART_SENTINEL for the actions that leave a
+        board the current frame must not advance.
+        """
+        if action == ACTION_QUIT:
+            self.running = False
+        elif action == ACTION_TOGGLE_TICK_SPEED_LIMIT:
+            self.config.limitTickSpeed = not self.config.limitTickSpeed
+        elif action == ACTION_TOGGLE_FULLSCREEN:
+            self.config.fullscreen = not self.config.fullscreen
+            self.initializeGameDisplay()
+        elif action == ACTION_CYCLE_COSMETIC:
+            self.cycleSelectedCosmetic()
+        elif action == ACTION_RESTART_RUN:
+            self.restartRun()
+            return RESTART_SENTINEL
+        elif action == ACTION_OPEN_SHOP:
+            self.openShop()
+            return RESTART_SENTINEL
+        return None
 
     def cycleSelectedCosmetic(self):
         currentCosmetic = self.saveManager.data.get("selectedCosmetic", "default")
@@ -1011,7 +996,7 @@ class Ophidian:
             restarted = False
             key = self.textRenderer.getKeyPress(timeout=0)
             if key:
-                restarted = self.handleKeyDownEvent(key) == "restart"
+                restarted = self.handleKeyDownEvent(key) == RESTART_SENTINEL
 
             # Move snake based on direction. Skipped on a restart frame so
             # the freshly initialized board is presented before it advances
@@ -1064,7 +1049,7 @@ class Ophidian:
                 if event.type == self.pygame.QUIT:
                     self.quitApplication()
                 elif event.type == self.pygame.KEYDOWN:
-                    if self.handleKeyDownEvent(event.key) == "restart":
+                    if self.handleKeyDownEvent(event.key) == RESTART_SENTINEL:
                         restarted = True
                 elif event.type == self.pygame.WINDOWRESIZED:
                     self.initializeLocationWidthAndHeight()
