@@ -7,9 +7,15 @@ sharing down: a rule reachable from only one of them shows up here as a
 missing test rather than as silent drift.
 """
 
+import pytest
+
 from textui.textrenderer import TextRenderer
 
-from controls.keybindings import RESTART_SENTINEL
+from controls.keybindings import (
+    ACTION_TOGGLE_FULLSCREEN,
+    RESTART_SENTINEL,
+    TEXT_UI_ACTION_KEYS,
+)
 from ophidian import Ophidian
 
 
@@ -124,4 +130,30 @@ def test_text_ui_has_no_fullscreen_binding(tmp_path, monkeypatch):
     # would be reaching for a pygame this run never imported
     game = _makeGame(monkeypatch, tmp_path)
 
-    assert game.handleKeyDownEvent("\x1b[21~") is None  # xterm's F11
+    assert ACTION_TOGGLE_FULLSCREEN not in game.actionKeys.values()
+
+
+def test_every_action_a_key_table_can_produce_is_handled(tmp_path, monkeypatch):
+    # the tables and the dispatch can drift apart even though the two UIs
+    # no longer can: an action bound to a key with no branch in
+    # performAction would be a binding that quietly does nothing
+    game = _makeGame(monkeypatch, tmp_path)
+    monkeypatch.setattr(game, "openTextShop", lambda: None)
+    monkeypatch.setattr(game, "checkForLevelProgressAndReinitialize", lambda: None)
+
+    # every action either table can produce. That this is the whole set -
+    # that the graphical table adds fullscreen and nothing else - is what
+    # tests/controls/test_keybindings.py pins down. Fullscreen is safe to
+    # perform here because initializeGameDisplay() returns immediately in
+    # text mode.
+    boundActions = set(TEXT_UI_ACTION_KEYS.values()) | {ACTION_TOGGLE_FULLSCREEN}
+
+    for action in boundActions:
+        game.performAction(action)
+
+
+def test_performing_an_unknown_action_fails_loudly(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+
+    with pytest.raises(ValueError):
+        game.performAction("notAnAction")

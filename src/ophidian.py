@@ -644,6 +644,10 @@ class Ophidian:
         trigger lives once, below.
         """
         if self.config.useTextUI:
+            # copied rather than referenced so a table belongs to the
+            # instance either way - the pygame builders below hand back a
+            # fresh dict, and rebinding a key on one game must not reach
+            # into the module-level table every other game reads
             self.directionKeys = dict(TEXT_UI_DIRECTION_KEYS)
             self.actionKeys = dict(TEXT_UI_ACTION_KEYS)
         else:
@@ -703,6 +707,14 @@ class Ophidian:
         elif action == ACTION_OPEN_SHOP:
             self.openShop()
             return RESTART_SENTINEL
+        else:
+            # an action a key table can produce but nothing here handles is
+            # a binding that would silently do nothing - the same drift
+            # this dispatch exists to remove, so it is raised rather than
+            # swallowed. No key press can reach here without having been
+            # found in a table first, so this is a programming error and
+            # never player input.
+            raise ValueError("Unhandled action: " + str(action))
         return None
 
     def cycleSelectedCosmetic(self):
