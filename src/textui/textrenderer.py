@@ -5,6 +5,7 @@ import termios
 import tty
 import select
 
+from controls.keybindings import normalizeTextUiKey
 from scoring.scoring import formatScoreLabel
 
 # Windows-specific import
@@ -171,11 +172,23 @@ class TextRenderer:
         filled = max(0, min(cells, int(cells * fractionRemaining)))
         return "[" + "█" * filled + "░" * (cells - filled) + "]"
 
+    def renderPauseNotice(self, paused):
+        """Says so while the run is held, and nothing at all while it isn't.
+
+        A held run is otherwise indistinguishable from a hung one: the
+        screen is redrawn every frame either way, and the only difference
+        is that nothing on it moves.
+        """
+        if not paused:
+            return
+        print("\n[PAUSED] press space to resume")
+
     def renderControls(self):
         """Render control instructions"""
         print(
             "\nControls: w/↑=Up, a/←=Left, s/↓=Down, d/→=Right, "
-            "c=Cycle skin, p=Shop, l=Toggle tick speed limit, r=Restart, q=Quit"
+            "space=Pause, c=Cycle skin, p=Shop, "
+            "l=Toggle tick speed limit, r=Restart, q=Quit"
         )
 
     def enableRawMode(self):
@@ -194,7 +207,18 @@ class TextRenderer:
         Get a key press without blocking (non-blocking input)
         Returns the key pressed or None if no key was pressed
         Handles arrow keys by reading full escape sequences
+
+        The character is normalized to the spelling the key tables use
+        before it is handed on, in the same way the Windows branch below
+        already normalizes arrow scancodes into the escape sequences the
+        Unix branch produces - what the terminal calls a key is this
+        method's business, and nothing downstream should have to know that
+        Caps Lock was on (see issue #129).
         """
+        return normalizeTextUiKey(self.readRawKeyPress(timeout))
+
+    def readRawKeyPress(self, timeout=0):
+        """The key exactly as the terminal spelled it, or None."""
         if os.name != "nt":
             # Unix/Linux/Mac
             if select.select([sys.stdin], [], [], timeout)[0]:

@@ -27,6 +27,7 @@ def test_pygame_key_tables_are_built_from_real_pygame_key_codes():
         pygame.K_c,
         pygame.K_p,
         pygame.K_F11,
+        pygame.K_SPACE,
     }
 
 

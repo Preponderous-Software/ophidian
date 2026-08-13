@@ -60,6 +60,36 @@ def test_pygame_restart_frame_renders_the_new_board_before_advancing_it(
     assert len(moves) == 1
 
 
+def test_pygame_space_pauses_and_the_loop_declines_to_move_a_held_snake(
+    pygameGame, monkeypatch
+):
+    # the graphical half of issue #130: pausing is gameplay state, so both
+    # loops have to honour it identically. The text counterpart lives in
+    # tests/test_ophidian_pause.py.
+    game = pygameGame
+    monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
+
+    # pause on the first frame, quit on the second; without the pause the
+    # first frame would have moved the snake
+    eventFrames = [
+        [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_SPACE)],
+        [pygame.event.Event(pygame.KEYDOWN, key=pygame.K_q)],
+    ]
+    monkeypatch.setattr(
+        pygame.event, "get", lambda: eventFrames.pop(0) if eventFrames else []
+    )
+    moves = []
+    monkeypatch.setattr(
+        Ophidian, "moveEntity", lambda self, entity, direction: moves.append(direction)
+    )
+
+    game.runPygameUI()
+
+    assert game.paused is True
+    assert moves == []
+    assert game.tick == 0
+
+
 def test_pygame_restart_does_not_drop_events_queued_behind_it(pygameGame, monkeypatch):
     # the restart flag is tracked across the whole drain rather than
     # breaking out of it, so a key pressed in the same frame still lands

@@ -94,3 +94,35 @@ def test_clear_drops_every_timer():
 
     assert active.statuses(now=100) == []
     assert active.isActive(PowerUpType.SPEED) is False
+
+
+def test_shift_deadlines_gives_back_the_time_a_hold_cost():
+    # issue #130: the timers are wall-clock based, so a 60s pause would
+    # otherwise drain a 5s boost to nothing
+    active = ActivePowerUps()
+    active.activate(PowerUpType.SPEED, 5.0, now=100)
+
+    active.shiftDeadlines(60)
+
+    assert active.remainingSeconds(PowerUpType.SPEED, now=160) == 5.0
+
+
+def test_shift_deadlines_moves_every_running_timer_by_the_same_amount():
+    active = ActivePowerUps()
+    active.activate(PowerUpType.SPEED, 5.0, now=100)
+    active.activate(PowerUpType.INVINCIBILITY, 3.0, now=100)
+
+    active.shiftDeadlines(10)
+
+    assert active.statuses(now=110) == [
+        (PowerUpType.SPEED, 5.0),
+        (PowerUpType.INVINCIBILITY, 3.0),
+    ]
+
+
+def test_shift_deadlines_does_not_revive_a_power_up_that_is_not_running():
+    active = ActivePowerUps()
+
+    active.shiftDeadlines(10)
+
+    assert active.statuses(now=100) == []
