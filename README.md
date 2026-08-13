@@ -72,12 +72,21 @@ w / ↑ | move up
 a / ← | move left
 s / ↓ | move down
 d / → | move right
+space | pause / resume
 f11 | fullscreen (graphical UI only)
 l | toggle tick speed limit
 c | cycle selected cosmetic skin
 p | open the upgrade shop
 r | restart
 q | quit
+
+Letter keys are matched regardless of case in either UI, so the controls keep working
+with Caps Lock on.
+
+While paused, the ophidian stops where it stands, the tick count stops rising, and any
+power-up you are carrying keeps the time it had left rather than draining away. Both
+UIs say on screen that the run is held. Restarting a paused run starts the new one
+unpaused.
 
 ## Support
 You can find the support discord server [here](https://discord.gg/49J4RHQxhy).

@@ -52,6 +52,7 @@ from controls.keybindings import (
     ACTION_QUIT,
     ACTION_RESTART_RUN,
     ACTION_TOGGLE_FULLSCREEN,
+    ACTION_TOGGLE_PAUSE,
     ACTION_TOGGLE_TICK_SPEED_LIMIT,
     OPPOSITE_DIRECTIONS,
     RESTART_SENTINEL,
@@ -707,6 +708,8 @@ class Ophidian:
         elif action == ACTION_OPEN_SHOP:
             self.openShop()
             return RESTART_SENTINEL
+        elif action == ACTION_TOGGLE_PAUSE:
+            self.togglePause()
         else:
             # an action a key table can produce but nothing here handles is
             # a binding that would silently do nothing - the same drift
@@ -716,6 +719,46 @@ class Ophidian:
             # never player input.
             raise ValueError("Unhandled action: " + str(action))
         return None
+
+    def togglePause(self):
+        """Holds the run where it stands, or lets it go again.
+
+        Both loops keep polling input and redrawing while held - only the
+        movement step and the tick counter are suspended - so the game
+        still answers the keyboard and both UIs can say that it is paused.
+
+        Resuming pushes the power-up deadlines forward by however long the
+        hold lasted. Their timers are wall-clock based rather than tick
+        based, so without that a boost would quietly drain to nothing while
+        the game sat still and be gone the instant play resumed (issue
+        #130). Nothing else needs the same treatment: the tick counter is
+        advanced by endOfTick(), which skips paused frames outright.
+        """
+        self.paused = not self.paused
+        if self.paused:
+            self.pausedAt = time.time()
+        else:
+            if self.pausedAt is not None:
+                self.activePowerUps.shiftDeadlines(time.time() - self.pausedAt)
+            self.pausedAt = None
+
+    def drawPauseNotice(self):
+        """Says so, over the middle of the board, while the run is held.
+
+        The graphical counterpart of TextRenderer.renderPauseNotice: a held
+        run redraws every frame exactly like a running one, so without this
+        the only difference on screen is that nothing moves.
+        """
+        if self.config.useTextUI or not self.paused:
+            return
+        width, height = self.gameDisplay.get_size()
+        self.graphik.drawText(
+            "PAUSED - press space to resume",
+            width // 2,
+            height // 2,
+            20,
+            self.config.black,
+        )
 
     def cycleSelectedCosmetic(self):
         currentCosmetic = self.saveManager.data.get("selectedCosmetic", "default")
@@ -914,6 +957,10 @@ class Ophidian:
         self.score = 0
         self.snakeParts = []
         self.tick = 0
+        # a board nobody has played yet is never held: restarting out of a
+        # paused run must not hand the player a frozen new one
+        self.paused = False
+        self.pausedAt = None
         purchasedUpgrades = self.saveManager.data.get("purchasedUpgrades", [])
         # effective tick speed is always derived from the stored base each
         # time (never mutated in place), so ascension/slow_starter bonuses
@@ -977,9 +1024,17 @@ class Ophidian:
         is reset nowhere else, not even in initialize()), locking the snake
         into one direction, and froze self.tick so runs recorded a stale
         ticksSurvived (see issue #112).
+
+        A paused frame is not a tick: nothing moved, so counting it would
+        overstate the ticksSurvived the run is recorded with, and clearing
+        the direction latch would hand out one extra turn per held frame.
+        It sleeps regardless of limitTickSpeed, since a held game has no
+        reason to spin the processor at full speed (issue #130).
         """
-        if self.config.limitTickSpeed:
+        if self.paused or self.config.limitTickSpeed:
             time.sleep(self.config.tickSpeed)
+        if self.paused:
+            return
         self.tick += 1
         self.changedDirectionThisTick = False
 
@@ -1002,7 +1057,10 @@ class Ophidian:
     def runTextUI(self):
         """Run the game with text-based UI"""
         while self.running:
-            self.updatePowerUps()
+            # power-ups are neither aged nor expired while the run is held;
+            # togglePause() gives back the time the hold cost them
+            if not self.paused:
+                self.updatePowerUps()
 
             # Check for key press (non-blocking)
             restarted = False
@@ -1012,8 +1070,10 @@ class Ophidian:
 
             # Move snake based on direction. Skipped on a restart frame so
             # the freshly initialized board is presented before it advances
-            # - see runPygameUI, which must agree (issue #117).
-            if not restarted:
+            # - see runPygameUI, which must agree (issue #117) - and while
+            # the run is held, which is the whole of what pausing does to
+            # gameplay.
+            if not restarted and not self.paused:
                 self.moveSelectedSnakePart()
 
             # Render the game state
@@ -1039,6 +1099,7 @@ class Ophidian:
                 self.getActiveUpgradesSummary(),
                 self.getActivePowerUpStatuses(),
             )
+            self.textRenderer.renderPauseNotice(self.paused)
             self.textRenderer.renderControls()
 
             self.endOfTick()
@@ -1048,7 +1109,10 @@ class Ophidian:
     def runPygameUI(self):
         """Run the game with pygame graphical UI"""
         while self.running:
-            self.updatePowerUps()
+            # mirrors runTextUI: nothing about a held run ages, and both
+            # loops have to agree on that as much as on anything else
+            if not self.paused:
+                self.updatePowerUps()
 
             # tracked across the whole event drain rather than acted on
             # inside it: `continue` in the for loop only advanced to the
@@ -1066,7 +1130,7 @@ class Ophidian:
                 elif event.type == self.pygame.WINDOWRESIZED:
                     self.initializeLocationWidthAndHeight()
 
-            if not restarted:
+            if not restarted and not self.paused:
                 self.moveSelectedSnakePart()
 
             self.gameDisplay.fill(self.config.white)
@@ -1100,6 +1164,7 @@ class Ophidian:
 
             self.drawHud()
             self.drawUiMessage()
+            self.drawPauseNotice()
             self.pygame.display.update()
 
             self.endOfTick()

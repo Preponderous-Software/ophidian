@@ -233,6 +233,35 @@ def test_draw_hud_omits_power_up_line_when_none_is_running(pygameGame):
     )
 
 
+def test_draw_pause_notice_writes_over_the_middle_of_the_board(pygameGame):
+    # a held run redraws every frame exactly like a running one, so without
+    # something on screen it is indistinguishable from a hung game
+    game = pygameGame
+    surface = game.gameDisplay
+    surface.fill(game.config.white)  # matches the real frame's fill-before-draw
+    game.togglePause()
+
+    game.drawPauseNotice()
+
+    width, height = surface.get_size()
+    assert regionHasNonBackgroundPixel(
+        surface, (width // 4, height // 2 - 15, width // 2, 30), game.config.white
+    )
+
+
+def test_draw_pause_notice_is_a_noop_while_the_run_is_moving(pygameGame):
+    game = pygameGame
+    surface = game.gameDisplay
+    surface.fill(game.config.white)
+
+    game.drawPauseNotice()
+
+    width, height = surface.get_size()
+    assert not regionHasNonBackgroundPixel(
+        surface, (width // 4, height // 2 - 15, width // 2, 30), game.config.white
+    )
+
+
 def test_draw_hud_omits_power_up_line_for_one_with_no_time_left(pygameGame):
     # updatePowerUps() only clears an expired power-up on the next tick, so
     # it stays readable for one frame - don't draw "Speed boost: 0s"

@@ -38,6 +38,7 @@ ACTION_TOGGLE_FULLSCREEN = "toggleFullscreen"
 ACTION_RESTART_RUN = "restartRun"
 ACTION_CYCLE_COSMETIC = "cycleCosmetic"
 ACTION_OPEN_SHOP = "openShop"
+ACTION_TOGGLE_PAUSE = "togglePause"
 
 # Returned by handleKeyDownEvent() when the press replaced the board or
 # held the game while the player was elsewhere, so the frame it happened in
@@ -65,7 +66,28 @@ TEXT_UI_ACTION_KEYS = {
     "r": ACTION_RESTART_RUN,
     "c": ACTION_CYCLE_COSMETIC,
     "p": ACTION_OPEN_SHOP,
+    " ": ACTION_TOGGLE_PAUSE,
 }
+
+
+def normalizeTextUiKey(key):
+    """Folds a terminal key press to the spelling the tables above use.
+
+    The terminal hands over exactly the character that was typed, so with
+    Caps Lock on (or Shift held) "W" arrives where "w" is bound and the
+    press is looked up in both tables, found in neither, and silently
+    dropped - while the graphical UI carries on working, because pygame
+    reports K_w (the lowercase code point) for that key whatever the
+    modifiers are (see issue #129).
+
+    Only single-character keys are folded. The arrow keys arrive as
+    three-character escape sequences whose final letter is meaningful:
+    lowercasing "\\x1b[A" would produce "\\x1b[a", which is bound to
+    nothing at all.
+    """
+    if isinstance(key, str) and len(key) == 1:
+        return key.lower()
+    return key
 
 
 def buildPygameDirectionKeys(pygame):
@@ -99,4 +121,5 @@ def buildPygameActionKeys(pygame):
         pygame.K_r: ACTION_RESTART_RUN,
         pygame.K_c: ACTION_CYCLE_COSMETIC,
         pygame.K_p: ACTION_OPEN_SHOP,
+        pygame.K_SPACE: ACTION_TOGGLE_PAUSE,
     }

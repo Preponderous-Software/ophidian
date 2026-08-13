@@ -227,7 +227,16 @@ def test_render_controls_lists_key_bindings(renderer, capsys):
 
     out = capsys.readouterr().out
     assert "w/↑=Up" in out
+    assert "space=Pause" in out
     assert "q=Quit" in out
+
+
+def test_render_pause_notice_says_so_only_while_held(renderer, capsys):
+    renderer.renderPauseNotice(True)
+    assert "PAUSED" in capsys.readouterr().out
+
+    renderer.renderPauseNotice(False)
+    assert capsys.readouterr().out == ""
 
 
 def test_enable_and_disable_raw_mode_use_termios(renderer, monkeypatch):
@@ -301,3 +310,21 @@ def test_get_key_press_assembles_arrow_escape_sequence(renderer, monkeypatch):
     )
 
     assert renderer.getKeyPress() == "\x1b[A"
+
+
+def test_get_key_press_folds_a_shifted_letter_to_its_binding(renderer, monkeypatch):
+    # issue #129: with Caps Lock on the terminal delivers "W", which is
+    # bound to nothing; the graphical UI reports K_w either way
+    monkeypatch.setattr("os.name", "posix")
+
+    class FakeStdin:
+        def read(self, n):
+            return "W"
+
+    monkeypatch.setattr("sys.stdin", FakeStdin())
+    monkeypatch.setattr(
+        "select.select", lambda rlist, wlist, xlist, timeout: ([True], [], [])
+    )
+
+    assert renderer.readRawKeyPress() == "W"
+    assert renderer.getKeyPress() == "w"

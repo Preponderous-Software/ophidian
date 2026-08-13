@@ -90,3 +90,19 @@ class ActivePowerUps:
     def clear(self):
         """Drops every timer, e.g. when a new run or level starts."""
         self.expiresAt.clear()
+
+    def shiftDeadlines(self, seconds):
+        """Pushes every running timer back by `seconds`.
+
+        Timers are wall-clock based, so time a run spends held (see the
+        pause action in issue #130) would otherwise drain them: a 5s boost
+        paused for a minute would be gone the moment play resumed. Shifting
+        the deadlines by the length of the hold gives each power-up back
+        exactly the time it had left.
+
+        Only the deadlines move; which power-ups are running is unchanged,
+        so this stays the same kind of bookkeeping-only object it is
+        elsewhere and never revives one that already expired.
+        """
+        for powerUpType in self.expiresAt:
+            self.expiresAt[powerUpType] += seconds

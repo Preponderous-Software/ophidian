@@ -6,6 +6,7 @@ from controls.keybindings import (
     ACTION_QUIT,
     ACTION_RESTART_RUN,
     ACTION_TOGGLE_FULLSCREEN,
+    ACTION_TOGGLE_PAUSE,
     ACTION_TOGGLE_TICK_SPEED_LIMIT,
     DIRECTION_DOWN,
     DIRECTION_LEFT,
@@ -16,6 +17,7 @@ from controls.keybindings import (
     TEXT_UI_DIRECTION_KEYS,
     buildPygameActionKeys,
     buildPygameDirectionKeys,
+    normalizeTextUiKey,
 )
 
 
@@ -39,6 +41,7 @@ class FakePygame:
     K_c = 12
     K_p = 13
     K_F11 = 14
+    K_SPACE = 15
 
 
 def test_opposite_directions_covers_every_direction_symmetrically():
@@ -66,6 +69,7 @@ def test_text_ui_action_keys_match_the_documented_controls():
         "r": ACTION_RESTART_RUN,
         "c": ACTION_CYCLE_COSMETIC,
         "p": ACTION_OPEN_SHOP,
+        " ": ACTION_TOGGLE_PAUSE,
     }
 
 
@@ -101,3 +105,24 @@ def test_fullscreen_is_the_only_action_the_text_ui_does_not_have():
 def test_each_action_is_bound_to_exactly_one_key(table):
     actions = list(table.values())
     assert len(actions) == len(set(actions))
+
+
+def test_every_text_ui_letter_key_is_reachable_with_caps_lock_on():
+    # issue #129: the shifted spelling of every bound letter has to fold
+    # back onto the binding, or that control is dead while Caps Lock is on
+    for table in (TEXT_UI_DIRECTION_KEYS, TEXT_UI_ACTION_KEYS):
+        for key in table:
+            assert normalizeTextUiKey(key.upper()) in table
+
+
+def test_normalizing_leaves_arrow_escape_sequences_alone():
+    # "\x1b[A".lower() would be "\x1b[a", which is bound to nothing
+    for sequence in ("\x1b[A", "\x1b[B", "\x1b[C", "\x1b[D"):
+        assert normalizeTextUiKey(sequence) == sequence
+        assert normalizeTextUiKey(sequence) in TEXT_UI_DIRECTION_KEYS
+
+
+def test_normalizing_passes_through_keys_that_have_no_case():
+    assert normalizeTextUiKey(" ") == " "
+    assert normalizeTextUiKey("\x1b") == "\x1b"
+    assert normalizeTextUiKey(None) is None
