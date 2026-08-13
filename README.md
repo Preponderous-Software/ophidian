@@ -80,7 +80,7 @@ p | open the upgrade shop
 r | restart
 q | quit
 
-Letter keys are matched regardless of case, so the controls keep working in both UIs
+Letter keys are matched regardless of case in either UI, so the controls keep working
 with Caps Lock on.
 
 While paused, the ophidian stops where it stands, the tick count stops rising, and any

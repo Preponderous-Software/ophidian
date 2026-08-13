@@ -10,6 +10,7 @@ prevent.
 
 import time
 
+from controls.keybindings import RESTART_SENTINEL
 from powerup.powerup import PowerUpType
 from textui.textrenderer import TextRenderer
 
@@ -46,7 +47,7 @@ def test_pausing_does_not_signal_a_restart(tmp_path, monkeypatch):
     game = _makeGame(monkeypatch, tmp_path)
     board = game.environment
 
-    game.handleKeyDownEvent(" ")
+    assert game.handleKeyDownEvent(" ") != RESTART_SENTINEL
 
     assert game.environment is board
 
