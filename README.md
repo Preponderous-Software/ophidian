@@ -88,6 +88,13 @@ power-up you are carrying keeps the time it had left rather than draining away. 
 UIs say on screen that the run is held. Restarting a paused run starts the new one
 unpaused.
 
+Opening the shop holds a power-up's timer the same way, so browsing upgrades never costs
+you the boost you are carrying.
+
+When a run ends in a collision, both UIs hold the board it ended on for a few seconds
+before the next one starts: the graphical UI turns it red and then shows the obituary,
+and the text UI prints a collision notice under the board, followed by the obituary.
+
 ## Support
 You can find the support discord server [here](https://discord.gg/49J4RHQxhy).
 
