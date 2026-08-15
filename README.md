@@ -93,7 +93,7 @@ you the boost you are carrying.
 
 When a run ends in a collision, both UIs hold the board it ended on for a few seconds
 before the next one starts: the graphical UI turns it red and then shows the obituary,
-and the text UI marks the collision on the grid and prints the obituary beneath it.
+and the text UI prints a collision notice under the board, followed by the obituary.
 
 ## Support
 You can find the support discord server [here](https://discord.gg/49J4RHQxhy).

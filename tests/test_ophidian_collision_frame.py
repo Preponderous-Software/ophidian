@@ -145,6 +145,58 @@ def test_the_graphical_death_frame_is_unchanged(tmp_path, monkeypatch):
     assert events == [("draw", False), "update"]
 
 
+def test_the_terminal_gets_the_obituary_exactly_once(tmp_path, monkeypatch):
+    # the death frame prints the obituary to the very stream the console copy
+    # goes to, so keeping both would put it in redirected output twice - the
+    # console copy is a log kept beside a window, and text mode has no window
+    game = _makeGame(monkeypatch, tmp_path)
+    monkeypatch.setattr(time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(TextRenderer, "renderGrid", lambda self, *args: None)
+    printed = []
+    monkeypatch.setattr(
+        Ophidian, "printObituaryToConsole", lambda self: printed.append("console")
+    )
+    monkeypatch.setattr(
+        TextRenderer, "renderObituary", lambda self, lines: printed.append("frame")
+    )
+    head = _blockTheWayAhead(game)
+
+    game.moveEntity(head, head.getDirection())
+
+    assert printed == ["frame"]
+
+
+def test_a_quit_or_restart_still_logs_the_obituary_to_the_console(
+    tmp_path, monkeypatch
+):
+    # only a run presented as a frame gives up its console copy; the runs the
+    # player ended themselves have no frame to carry it
+    game = _makeGame(monkeypatch, tmp_path)
+    printed = []
+    monkeypatch.setattr(
+        Ophidian, "printObituaryToConsole", lambda self: printed.append("console")
+    )
+
+    game.recordCurrentRun("quit")
+    game.recordCurrentRun("restart")
+
+    assert printed == ["console", "console"]
+
+
+def test_the_graphical_console_log_survives_a_collision(tmp_path, monkeypatch):
+    # the window and the console are two streams there, so the log is wanted
+    # alongside the obituary screen exactly as before
+    game = _makeGame(monkeypatch, tmp_path, useTextUI=False)
+    printed = []
+    monkeypatch.setattr(
+        Ophidian, "printObituaryToConsole", lambda self: printed.append("console")
+    )
+
+    game.recordCurrentRun("collision", presentedByRenderer=True)
+
+    assert printed == ["console"]
+
+
 def test_the_text_death_frame_does_not_touch_pygame(tmp_path, monkeypatch):
     # text mode never imports pygame at all, so reaching for it here would
     # not be a cosmetic mistake but a crash on the last frame of every run

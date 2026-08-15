@@ -266,7 +266,7 @@ class Ophidian:
         self.recordCurrentRun("restart")
         self.checkForLevelProgressAndReinitialize()
 
-    def recordCurrentRun(self, causeOfDeath):
+    def recordCurrentRun(self, causeOfDeath, presentedByRenderer=False):
         # bank currency earned this run before folding it into lifetime stats;
         # recordRun() below calls saveManager.save() which persists both
         earnedCurrency = currencyEarnedForRun(len(self.snakeParts))
@@ -285,14 +285,20 @@ class Ophidian:
             for skinId in newlyUnlocked:
                 self.notify("New skin unlocked: " + getSkinName(skinId) + "!")
             self.saveManager.save()
-        self.printObituaryToConsole()
+        # presentedByRenderer says a renderer is about to show this same
+        # obituary as part of a frame. In graphical mode the console copy is
+        # a log kept beside the window and is wanted either way; in text mode
+        # the console *is* the screen, so the two would be one stream and the
+        # obituary would appear twice in any redirected output.
+        if not (presentedByRenderer and self.config.useTextUI):
+            self.printObituaryToConsole()
 
     def printObituaryToConsole(self):
         """Prints the just-recorded obituary and lifetime chronicle to the console.
 
-        Called once per run-ending event (from recordCurrentRun), so this
-        never doubles up even when restartUponCollision immediately starts a
-        new life.
+        Called at most once per run-ending event (from recordCurrentRun), so
+        this never doubles up even when restartUponCollision immediately
+        starts a new life.
         """
         for line in formatObituaryScreen(
             self.lastObituary, self.saveManager.data["lifetimeStats"]
@@ -442,8 +448,10 @@ class Ophidian:
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
 
-        No-op for the text UI (which gets its version via
-        printObituaryToConsole) and when there's nothing recorded yet.
+        No-op when there's nothing recorded yet, and for the text UI, which
+        gets its version either from renderCollisionFrame (a run that ended
+        in a collision, where the epitaph belongs to the death frame) or
+        from printObituaryToConsole (a run the player quit or restarted).
         """
         if self.config.useTextUI or self.lastObituary is None:
             return
@@ -532,7 +540,7 @@ class Ophidian:
                 # we have a collision
                 self.collision = True
                 print("The ophidian collides with itself and ceases to be.")
-                self.recordCurrentRun("collision")
+                self.recordCurrentRun("collision", presentedByRenderer=True)
                 self.renderCollisionFrame()
                 time.sleep(self.config.tickSpeed * 20)
                 if not self.config.useTextUI:
