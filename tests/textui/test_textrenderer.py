@@ -136,6 +136,21 @@ def test_render_message_prints_nothing_when_there_is_no_message(renderer, capsys
     assert capsys.readouterr().out == ""
 
 
+def test_render_obituary_prints_every_line_it_is_given(renderer, capsys):
+    renderer.renderObituary(["== Obituary ==", "", "== Chronicle =="])
+
+    out = capsys.readouterr().out
+    assert "== Obituary ==" in out
+    assert "== Chronicle ==" in out
+
+
+def test_render_obituary_prints_nothing_when_there_is_nothing_to_say(renderer, capsys):
+    renderer.renderObituary(None)
+    renderer.renderObituary([])
+
+    assert capsys.readouterr().out == ""
+
+
 def test_render_hud_shows_currency_and_active_upgrades(renderer, capsys):
     renderer.renderHud(currency=42, activeUpgradeLabels=["Head Start", "Extra Life"])
 

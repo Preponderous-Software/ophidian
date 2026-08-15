@@ -113,6 +113,18 @@ class TextRenderer:
             return
         print(f"\n>>> {message}")
 
+    def renderObituary(self, lines):
+        """Render the end-of-run epitaph beneath the board it was earned on.
+
+        The lines arrive already formatted, the way renderMessage receives an
+        already-resolved string, so this renderer stays independent of the
+        progression package - and so the terminal's epitaph and the graphical
+        obituary screen cannot come to disagree about what a run's ending
+        says, both being the same lines from progression.obituary.
+        """
+        for line in lines or []:
+            print(line)
+
     def renderStats(self, level, snakeLength, score, percentage, scoreMultiplier=1.0):
         """Render game statistics
 

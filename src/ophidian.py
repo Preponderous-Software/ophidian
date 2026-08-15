@@ -406,6 +406,39 @@ class Ophidian:
                 status["color"],
             )
 
+    def renderCollisionFrame(self):
+        """Presents the one frame a run died on, in whichever UI is in use.
+
+        Called while self.collision is still set and before the pause that
+        lets the player read it, so each renderer gets the board as it stood
+        at the moment of death rather than the replacement one that
+        initialize() puts up straight afterwards.
+
+        The text UI previously had no counterpart to the graphical repaint
+        here at all, which left it reporting nothing whatsoever when a run
+        ended: the collision branch of TextRenderer.renderGrid was
+        unreachable under the default restartUponCollision, and the console
+        copies of the death message and the obituary are both wiped by the
+        clearScreen() at the top of the next renderGrid - the same erasure
+        that made notifications invisible in issue #110 (see issue #133).
+
+        The obituary is part of this frame in text mode because the terminal
+        has no second screen to give it; the graphical UI keeps showing its
+        own obituary screen after the pause, which is a screen of its own.
+        """
+        if self.config.useTextUI:
+            self.textRenderer.renderGrid(
+                self.environment, self.snakeParts, self.collision
+            )
+            self.textRenderer.renderObituary(
+                formatObituaryScreen(
+                    self.lastObituary, self.saveManager.data["lifetimeStats"]
+                )
+            )
+        else:
+            self.drawEnvironment()
+            self.pygame.display.update()
+
     def renderObituaryScreen(self):
         """Briefly overlays the obituary + chronicle screen on the pygame display.
 
@@ -500,9 +533,7 @@ class Ophidian:
                 self.collision = True
                 print("The ophidian collides with itself and ceases to be.")
                 self.recordCurrentRun("collision")
-                if not self.config.useTextUI:
-                    self.drawEnvironment()
-                    self.pygame.display.update()
+                self.renderCollisionFrame()
                 time.sleep(self.config.tickSpeed * 20)
                 if not self.config.useTextUI:
                     self.renderObituaryScreen()
@@ -587,11 +618,37 @@ class Ophidian:
     def openShop(self):
         """Opens the upgrade shop. Text UI gets a console menu (that's its
         native UI); pygame mode gets a real in-window screen (runPygameShop)
-        instead of blocking on stdin behind the graphical window."""
+        instead of blocking on stdin behind the graphical window.
+
+        Either one blocks the run loop for as long as the player browses, so
+        the time that costs is measured here and given back to the power-up
+        timers afterwards - see restorePowerUpTimeSpentAway.
+        """
+        openedAt = time.time()
         if self.config.useTextUI:
             self.openTextShop()
         else:
             self.runPygameShop()
+        self.restorePowerUpTimeSpentAway(openedAt)
+
+    def restorePowerUpTimeSpentAway(self, leftAt):
+        """Gives running power-ups back the real time the loop spent away
+        from the board.
+
+        Power-up timers are wall-clock based, so anything that holds the run
+        loop drains them: a 5s boost was gone after a minute spent in the
+        shop, and invincibility (3s) could not survive a shop visit at all
+        (issue #132). This is the same debt togglePause() settles for a held
+        run, owed by the other thing that stops the board.
+
+        Nothing is credited while the run is paused: pausedAt was recorded
+        before this interval began, so the eventual resume already shifts by
+        a span that contains it, and crediting here as well would hand the
+        same seconds over twice.
+        """
+        if self.paused:
+            return
+        self.activePowerUps.shiftDeadlines(time.time() - leftAt)
 
     def openTextShop(self):
         self.textRenderer.disableRawMode()
