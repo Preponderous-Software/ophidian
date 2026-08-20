@@ -1,5 +1,24 @@
-# /bin/bash
+#!/bin/bash
 # Usage: ./run.sh
+
+resolvePython() {
+    # pick an interpreter that meets the requirement in README.md, since
+    # `python` is Python 2 on some systems and absent on others. PYTHON can be
+    # set beforehand to override the choice - a virtualenv interpreter, say.
+    if [ -n "$PYTHON" ]; then
+        return
+    fi
+    for candidate in python3 python; do
+        if command -v "$candidate" > /dev/null 2>&1 &&
+            "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 8))' \
+                > /dev/null 2>&1; then
+            PYTHON="$candidate"
+            return
+        fi
+    done
+    echo "No Python 3.8 or newer interpreter found. Install one, or set PYTHON to the path of one."
+    exit 1
+}
 
 getLatest() {
     # get the latest version of the code
@@ -41,17 +60,18 @@ printVersion() {
 runTests() {
     # run tests
     echo "Running tests"
-    python -m pytest
+    "$PYTHON" -m pytest
     echo ""
 }
 
 startProgram() {
     # start program
     echo "Starting program"
-    python src/ophidian.py > output.txt
+    "$PYTHON" src/ophidian.py > output.txt
 }
 
 # main
+resolvePython
 getLatest
 printBranchStatus
 printVersion

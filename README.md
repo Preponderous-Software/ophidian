@@ -23,13 +23,21 @@ pip install -r requirements-dev.txt
 ### Graphical UI (Default)
 Run the game with the standard pygame graphical interface:
 ```bash
-python src/ophidian.py
+python3 src/ophidian.py
 ```
 
 ### Text-Based UI
 Run the game with a text-based terminal interface:
 ```bash
-python src/ophidian.py --text-ui
+python3 src/ophidian.py --text-ui
+```
+
+`./run.sh` starts the graphical UI too, after pulling the latest code and running
+the tests. It and `./test.sh` pick the interpreter themselves — `python3` first,
+then `python`, taking whichever reports 3.8 or newer — so set `PYTHON` to
+override that choice:
+```bash
+PYTHON=.venv/bin/python ./test.sh
 ```
 
 The text-based UI is perfect for:

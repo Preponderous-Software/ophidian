@@ -1,4 +1,4 @@
-# /bin/bash
+#!/bin/bash
 # Usage: ./format.sh
 
 # src/lib holds vendored copies of graphik and py_env_lib and is left alone by
