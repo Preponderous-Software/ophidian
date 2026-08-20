@@ -25,8 +25,10 @@ import pytest
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # resolved up front, since the resolver cases hand bash a PATH holding
-# nothing but their own fake interpreters.
+# nothing but their own fake interpreters. Absent bash there is nothing to
+# say about a bash script, so those cases skip rather than error out.
 BASH = shutil.which("bash")
+requiresBash = pytest.mark.skipif(BASH is None, reason="bash is not installed")
 
 SCRIPTS = ["test.sh", "run.sh", "format.sh"]
 PYTHON_CALLING_SCRIPTS = ["test.sh", "run.sh"]
@@ -103,6 +105,7 @@ def test_every_script_is_executable():
         assert os.access(os.path.join(REPO_ROOT, name), os.X_OK), name
 
 
+@requiresBash
 def test_every_script_is_valid_bash():
     for name in SCRIPTS:
         checked = subprocess.run(
@@ -136,6 +139,7 @@ def test_the_python_calling_scripts_resolve_before_running_anything():
         assert statements[0] == "resolvePython", (name, statements)
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_the_newest_qualifying_candidate_is_preferred(script, tmp_path):
     resolved = _runResolver(
@@ -146,6 +150,7 @@ def test_the_newest_qualifying_candidate_is_preferred(script, tmp_path):
     assert resolved.stdout.strip() == "python3"
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_a_python_2_fallback_is_taken_only_when_it_qualifies(script, tmp_path):
     resolved = _runResolver(tmp_path, script, {"python": (2, 7, 18)})
@@ -154,6 +159,7 @@ def test_a_python_2_fallback_is_taken_only_when_it_qualifies(script, tmp_path):
     assert "No Python 3.8 or newer interpreter found." in resolved.stdout
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_python_is_used_when_python3_is_absent(script, tmp_path):
     resolved = _runResolver(tmp_path, script, {"python": (3, 11, 0)})
@@ -162,6 +168,7 @@ def test_python_is_used_when_python3_is_absent(script, tmp_path):
     assert resolved.stdout.strip() == "python"
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_the_documented_minimum_version_is_the_one_enforced(script, tmp_path):
     minimum = _documentedMinimumVersion()
@@ -175,6 +182,7 @@ def test_the_documented_minimum_version_is_the_one_enforced(script, tmp_path):
     assert accepted.stdout.strip() == "python3"
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_a_preset_python_is_honored_without_probing(script, tmp_path):
     resolved = _runResolver(
@@ -185,6 +193,7 @@ def test_a_preset_python_is_honored_without_probing(script, tmp_path):
     assert resolved.stdout.strip() == "/opt/venv/bin/python"
 
 
+@requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_no_candidate_at_all_fails_with_an_actionable_message(script, tmp_path):
     resolved = _runResolver(tmp_path, script, {})
