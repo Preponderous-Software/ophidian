@@ -2,3 +2,7 @@
 output.txt
 save.json
 .claude/
+
+# coverage artifacts left behind by test.sh
+.coverage
+cov.xml
