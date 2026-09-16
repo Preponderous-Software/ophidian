@@ -1,6 +1,6 @@
 import os
 
-from lib.trace_client import TraceClient
+from lib.trace_client import TraceClient, environment_opts_out
 
 # @author Daniel McCoy Stephenson
 # @since September 11th, 2026
@@ -22,6 +22,9 @@ VERSION_FILE = os.path.join(
     "version.txt",
 )
 
+# Where what is sent, what is not, and every opt-out are written up.
+DETAILS_URL = "https://github.com/Stephenson-Software/trace#usage-reporting"
+
 # Shown once, the first time the game starts with a save that predates the
 # usageReporting block (or with no save at all); SaveManager then writes the
 # block so it is never shown again. Printed rather than queued on the banner:
@@ -29,9 +32,26 @@ VERSION_FILE = os.path.join(
 FIRST_RUN_NOTICE = (
     "Usage reporting is on: ophidian sends a startup event (program name and "
     "version only) and a run-ended event (how the run ended only) to "
-    "trace.danielstephenson.dev. Turn it off with "
-    '"usageReporting": {"enabled": false} in save.json.'
+    "https://trace.danielstephenson.dev - nothing about you or your machine. "
+    'Turn it off with "usageReporting": {"enabled": false} in save.json, or '
+    "for every trace-reporting program with the environment variable "
+    "TRACE_USAGE_REPORTING=off. Details: " + DETAILS_URL
 )
+
+# What the first run says instead when TRACE_USAGE_REPORTING=off or
+# DO_NOT_TRACK=1 is already set: the save still gets its block, but claiming
+# reporting is on would be untrue.
+FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT = (
+    "Usage reporting is off (environment). Details: " + DETAILS_URL
+)
+
+
+def firstRunNotice():
+    """The line the first run prints: FIRST_RUN_NOTICE, unless the
+    environment has already opted out of usage reporting."""
+    if environment_opts_out():
+        return FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT
+    return FIRST_RUN_NOTICE
 
 
 def defaultUsageReportingSettings():
@@ -64,16 +84,26 @@ def createUsageReporter(settings):
     and never raises, so nothing about reporting can stop a run: a block
     that is missing, malformed, disabled, or without a key gives the
     no-op client.
+
+    The client is always built through TraceClient, even when the block
+    says off, because the client checks the TRACE_USAGE_REPORTING and
+    DO_NOT_TRACK environment variables before anything in the block and
+    records why it is off in disabled_reason ("environment", "config" or
+    "no key").
     """
     if not isinstance(settings, dict):
-        return TraceClient.disabled()
-    enabled = settings.get("enabled", True)
+        settings = {}
+        enabled = False
+    else:
+        enabled = settings.get("enabled", True) is True
     endpoint = settings.get("endpoint") or DEFAULT_ENDPOINT
+    if not isinstance(endpoint, str):
+        endpoint, enabled = DEFAULT_ENDPOINT, False
     key = settings.get("key")
-    if enabled is not True or not isinstance(endpoint, str) or not isinstance(key, str):
-        return TraceClient.disabled()
+    if not isinstance(key, str):
+        key = None
     try:
-        return TraceClient(endpoint, APPLICATION, key=key, enabled=True)
+        return TraceClient(endpoint, APPLICATION, key=key, enabled=enabled)
     except ValueError:
         return TraceClient.disabled()
 

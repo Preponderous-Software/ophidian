@@ -44,7 +44,7 @@ from progression.ascension import (
     shouldAscend,
     applyAscension,
 )
-from reporting.usage import FIRST_RUN_NOTICE, createUsageReporter, startupTags
+from reporting.usage import createUsageReporter, firstRunNotice, startupTags
 from ui.banner import UiBanner
 from ui.shop_screen import PygameShopScreen
 from ui.text_wrap import wrapLinesToWidth
@@ -285,10 +285,12 @@ class Ophidian:
         The reporter's report() returns at once and never raises, so this
         runs on the main thread without a frame ever waiting on it, and the
         "usageReporting": {"enabled": false} switch in save.json (the notice
-        says so) yields a client that does nothing at all.
+        says so) yields a client that does nothing at all, as do the
+        TRACE_USAGE_REPORTING=off and DO_NOT_TRACK=1 environment variables,
+        which the client checks first.
         """
         if self.saveManager.usageReportingNoticeDue:
-            print(FIRST_RUN_NOTICE)
+            print(firstRunNotice())
             self.saveManager.save()
         reporter = createUsageReporter(self.saveManager.data.get("usageReporting"))
         reporter.report("startup", tags=startupTags())
