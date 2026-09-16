@@ -4,7 +4,11 @@ import os
 import ophidian
 from ophidian import Ophidian
 from progression import save
-from reporting.usage import FIRST_RUN_NOTICE, defaultUsageReportingSettings
+from reporting.usage import (
+    FIRST_RUN_NOTICE,
+    FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT,
+    defaultUsageReportingSettings,
+)
 from textui.textrenderer import TextRenderer
 
 
@@ -146,3 +150,18 @@ def test_an_opted_out_save_gets_no_notice(tmp_path, monkeypatch, capsys):
     _makeGame(monkeypatch, tmp_path)
 
     assert FIRST_RUN_NOTICE not in capsys.readouterr().out
+
+
+def test_first_run_under_an_environment_opt_out_says_reporting_is_off(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setenv("TRACE_USAGE_REPORTING", "off")
+
+    _makeGame(monkeypatch, tmp_path)
+
+    out = capsys.readouterr().out
+    assert FIRST_RUN_NOTICE not in out
+    assert out.count(FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT) == 1
+    # the environment never rewrites the save: the block is still the default
+    with open(os.path.join(tmp_path, "save.json")) as f:
+        assert json.load(f)["usageReporting"] == defaultUsageReportingSettings()

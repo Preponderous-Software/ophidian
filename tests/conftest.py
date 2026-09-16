@@ -29,6 +29,11 @@ def _neverReportUsageFromTests(monkeypatch):
     monkeypatch.setattr(
         ophidian, "createUsageReporter", lambda settings: TraceClient.disabled()
     )
+    # The machine running the tests may itself have opted out of usage
+    # reporting; every test starts from a clean environment and sets what
+    # it needs.
+    monkeypatch.delenv("TRACE_USAGE_REPORTING", raising=False)
+    monkeypatch.delenv("DO_NOT_TRACK", raising=False)
 
     realUrlopen = urllib.request.urlopen
 
