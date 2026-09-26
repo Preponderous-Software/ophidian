@@ -150,11 +150,7 @@ def test_a_choice_the_menu_does_not_list_is_invalid(
     assert game.saveManager.data["purchasedUpgrades"] == []
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="issue #145: a negative choice indexes the upgrade list from the end",
-)
-@pytest.mark.parametrize("choice", ["-1", "-2"])
+@pytest.mark.parametrize("choice", ["-1", "-2", "-3"])
 def test_a_negative_choice_is_invalid(tmp_path, monkeypatch, capsys, choice):
     game = _makeGame(monkeypatch, tmp_path, currency=100)
     _typeChoice(monkeypatch, choice)
@@ -162,7 +158,9 @@ def test_a_negative_choice_is_invalid(tmp_path, monkeypatch, capsys, choice):
     game.openTextShop()
 
     assert "Invalid selection." in capsys.readouterr().out
+    assert game.saveManager.data["currency"] == 100
     assert game.saveManager.data["purchasedUpgrades"] == []
+    assert not (tmp_path / "shop-save.json").exists()
 
 
 def _recordRawMode(monkeypatch):
