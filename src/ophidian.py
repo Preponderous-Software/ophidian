@@ -733,7 +733,12 @@ class Ophidian:
             choice = input("Choose an upgrade to purchase (0 to exit): ").strip()
             if choice and choice != "0":
                 try:
-                    selectedUpgrade = upgrades[int(choice) - 1]
+                    selectedNumber = int(choice)
+                    # bounds-checked rather than left to IndexError, since a
+                    # negative index would buy an upgrade from the list's end
+                    if not 1 <= selectedNumber <= len(upgrades):
+                        raise IndexError(selectedNumber)
+                    selectedUpgrade = upgrades[selectedNumber - 1]
                 except (ValueError, IndexError):
                     print("Invalid selection.")
                 else:
