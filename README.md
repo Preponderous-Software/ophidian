@@ -115,7 +115,7 @@ played:
 Event | When | What it carries
 ------------ | ------------- | -------------
 `startup` | the game starts | the program name (`ophidian`) and the version in `version.txt`
-`run-ended` | a run ends | how it ended: `collision`, `restart` or `quit`
+`run-ended` | a run ends | how it ended: `collision`, `restart` or `quit`, and the version in `version.txt`
 
 No usernames, hostnames, IP addresses, paths, save contents or scores are ever sent. Reporting
 happens on a background thread, never delays a frame, and never stops the game if the

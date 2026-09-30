@@ -12,11 +12,11 @@ from reporting.usage import (
     DETAILS_URL,
     FIRST_RUN_NOTICE,
     FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT,
+    UNKNOWN_VERSION,
     createUsageReporter,
     defaultUsageReportingSettings,
     firstRunNotice,
     readVersion,
-    startupTags,
 )
 
 
@@ -66,10 +66,9 @@ def test_version_comes_from_version_txt_at_the_repository_root():
         expected = f.read().strip()
     assert expected, "version.txt is empty"
     assert readVersion() == expected
-    assert startupTags() == {"version": expected}
 
 
-def test_missing_or_empty_version_file_means_no_version_tag(tmp_path, monkeypatch):
+def test_missing_or_empty_version_file_means_an_unknown_version(tmp_path, monkeypatch):
     absent = os.path.join(tmp_path, "absent.txt")
     assert readVersion(absent) is None
     empty = tmp_path / "version.txt"
@@ -78,7 +77,22 @@ def test_missing_or_empty_version_file_means_no_version_tag(tmp_path, monkeypatc
 
     monkeypatch.setattr(usage, "VERSION_FILE", absent)
     assert readVersion() is None
-    assert startupTags() == {}
+    # the client requires a version; a missing file must not stop startup,
+    # and the events say "unknown" rather than a made-up number
+    received = {"arrived": threading.Event()}
+    server = _stubServer(received)
+    try:
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+        reporter = createUsageReporter(
+            {"enabled": True, "endpoint": endpoint, "key": "test-key"}
+        )
+        reporter.report("startup")
+        assert received["arrived"].wait(5), "the startup event never arrived"
+        reporter.close()
+    finally:
+        server.shutdown()
+    assert received["body"]["tags"] == {"version": UNKNOWN_VERSION}
+    assert UNKNOWN_VERSION == "unknown"
 
 
 def test_disabled_settings_yield_a_reporter_that_sends_nothing():
@@ -103,10 +117,11 @@ def test_enabled_settings_report_under_the_program_name_to_the_configured_endpoi
     try:
         endpoint = "http://127.0.0.1:%d" % server.server_address[1]
         reporter = createUsageReporter(
-            {"enabled": True, "endpoint": endpoint, "key": "test-key"}
+            {"enabled": True, "endpoint": endpoint, "key": "test-key"},
+            version="9.9.9",
         )
         assert reporter.enabled is True
-        reporter.report("startup", tags=startupTags(version="9.9.9"))
+        reporter.report("startup")
         assert received["arrived"].wait(5), "the startup event never arrived"
         reporter.close()
     finally:
@@ -118,6 +133,27 @@ def test_enabled_settings_report_under_the_program_name_to_the_configured_endpoi
         "application": "ophidian",
         "name": "startup",
         "tags": {"version": "9.9.9"},
+    }
+
+
+def test_every_event_carries_the_version_from_version_txt():
+    received = {"arrived": threading.Event()}
+    server = _stubServer(received)
+    try:
+        endpoint = "http://127.0.0.1:%d" % server.server_address[1]
+        reporter = createUsageReporter(
+            {"enabled": True, "endpoint": endpoint, "key": "test-key"}
+        )
+        reporter.report("run-ended", tags={"cause": "quit"})
+        assert received["arrived"].wait(5), "the run-ended event never arrived"
+        reporter.close()
+    finally:
+        server.shutdown()
+
+    assert received["body"] == {
+        "application": "ophidian",
+        "name": "run-ended",
+        "tags": {"cause": "quit", "version": readVersion()},
     }
 
 
@@ -157,7 +193,7 @@ def test_environment_opt_out_wins_over_an_enabled_save(monkeypatch):
             )
             assert reporter.enabled is False, variable
             assert reporter.disabled_reason == "environment", variable
-            reporter.report("startup", tags=startupTags(version="9.9.9"))
+            reporter.report("startup")
             reporter.report("run-ended", tags={"cause": "quit"})
             reporter.close()
             assert not received["arrived"].wait(0.5), "%s=%s still sent an event" % (

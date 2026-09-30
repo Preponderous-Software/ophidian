@@ -49,7 +49,7 @@ def _recordReporters(monkeypatch):
     return built
 
 
-def test_startup_is_reported_once_with_the_games_version(tmp_path, monkeypatch):
+def test_startup_is_reported_once(tmp_path, monkeypatch):
     built = _recordReporters(monkeypatch)
 
     game = _makeGame(monkeypatch, tmp_path)
@@ -58,11 +58,8 @@ def test_startup_is_reported_once_with_the_games_version(tmp_path, monkeypatch):
     settings, reporter = built[0]
     assert settings == defaultUsageReportingSettings()
     assert game.usageReporter is reporter
-    with open(
-        os.path.join(os.path.dirname(ophidian.__file__), "..", "version.txt")
-    ) as f:
-        version = f.read().strip()
-    assert reporter.reports == [("startup", None, {"version": version})]
+    # the version rides on every event, added by the client itself
+    assert reporter.reports == [("startup", None, {})]
 
 
 def test_reporter_is_built_from_the_saves_usage_reporting_block(tmp_path, monkeypatch):

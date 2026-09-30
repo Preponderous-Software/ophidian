@@ -16,7 +16,7 @@ DEFAULT_ENDPOINT = "https://trace.danielstephenson.dev"
 DEFAULT_KEY = "P2kWGUhAW4-5LIvQ8L0P8qs3unOPXTulkyikLGpsulI"
 
 # version.txt at the repository root is what run.sh prints as the current
-# version, so it is the version the startup event carries too.
+# version, so it is the version every event carries too.
 VERSION_FILE = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
     "version.txt",
@@ -31,7 +31,8 @@ DETAILS_URL = "https://github.com/Stephenson-Software/trace#usage-reporting"
 # the banner is a single 30px line and this would not fit.
 FIRST_RUN_NOTICE = (
     "Usage reporting is on: ophidian sends a startup event (program name and "
-    "version only) and a run-ended event (how the run ended only) to "
+    "version only) and a run-ended event (how the run ended and the version "
+    "only) to "
     "https://trace.danielstephenson.dev - nothing about you or your machine. "
     'Turn it off with "usageReporting": {"enabled": false} in save.json, or '
     "for every trace-reporting program with the environment variable "
@@ -64,10 +65,15 @@ def defaultUsageReportingSettings():
     }
 
 
+# What every event carries as its version when version.txt is missing or
+# empty: the client requires a non-blank version, and a missing file must
+# never stop the game from starting.
+UNKNOWN_VERSION = "unknown"
+
+
 def readVersion(path=None):
     """The game's version as version.txt states it, or None if the file is
-    missing or empty - in which case the startup event carries no version
-    rather than a made-up one."""
+    missing or empty."""
     try:
         with open(path or VERSION_FILE, "r") as f:
             version = f.read().strip()
@@ -76,9 +82,11 @@ def readVersion(path=None):
     return version or None
 
 
-def createUsageReporter(settings):
+def createUsageReporter(settings, version=None):
     """Builds the client the game reports through, from the usageReporting
-    block of the save data.
+    block of the save data. Every event it sends carries ``version`` (by
+    default the one in version.txt, or UNKNOWN_VERSION without one) as the
+    tag ``version``.
 
     Every path through here yields a client whose report() returns at once
     and never raises, so nothing about reporting can stop a run: a block
@@ -102,16 +110,9 @@ def createUsageReporter(settings):
     key = settings.get("key")
     if not isinstance(key, str):
         key = None
+    if not isinstance(version, str) or not version.strip():
+        version = readVersion() or UNKNOWN_VERSION
     try:
-        return TraceClient(endpoint, APPLICATION, key=key, enabled=enabled)
+        return TraceClient(endpoint, APPLICATION, version, key=key, enabled=enabled)
     except ValueError:
         return TraceClient.disabled()
-
-
-def startupTags(version=None):
-    """Tags for the startup event: the version, when there is one."""
-    if version is None:
-        version = readVersion()
-    if version is None:
-        return {}
-    return {"version": version}
