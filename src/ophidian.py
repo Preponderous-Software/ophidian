@@ -44,7 +44,7 @@ from progression.ascension import (
     shouldAscend,
     applyAscension,
 )
-from reporting.usage import createUsageReporter, firstRunNotice, startupTags
+from reporting.usage import createUsageReporter, firstRunNotice
 from ui.banner import UiBanner
 from ui.shop_screen import PygameShopScreen
 from ui.text_wrap import wrapLinesToWidth
@@ -293,12 +293,12 @@ class Ophidian:
             print(firstRunNotice())
             self.saveManager.save()
         reporter = createUsageReporter(self.saveManager.data.get("usageReporting"))
-        reporter.report("startup", tags=startupTags())
+        reporter.report("startup")
         return reporter
 
     def recordCurrentRun(self, causeOfDeath, presentedByRenderer=False):
         # one run-ended event per run, however it ended; the cause is the
-        # only tag, and nothing about the player or the machine goes with it
+        # only tag besides the version the client adds, and nothing about the player or the machine goes with it
         self.usageReporter.report("run-ended", tags={"cause": causeOfDeath})
         # bank currency earned this run before folding it into lifetime stats;
         # recordRun() below calls saveManager.save() which persists both
