@@ -343,3 +343,115 @@ def test_get_key_press_folds_a_shifted_letter_to_its_binding(renderer, monkeypat
 
     assert renderer.readRawKeyPress() == "W"
     assert renderer.getKeyPress() == "w"
+
+
+def test_get_key_press_returns_a_lone_escape_when_nothing_follows(
+    renderer, monkeypatch
+):
+    monkeypatch.setattr("os.name", "posix")
+
+    class FakeStdin:
+        def read(self, n):
+            return "\x1b"
+
+    # only the first poll finds input waiting; the follow-up polls for the
+    # rest of an arrow sequence come back empty
+    ready = iter([True])
+    monkeypatch.setattr("sys.stdin", FakeStdin())
+    monkeypatch.setattr(
+        "select.select",
+        lambda rlist, wlist, xlist, timeout: (
+            ([True], [], []) if next(ready, False) else ([], [], [])
+        ),
+    )
+
+    assert renderer.getKeyPress() == "\x1b"
+
+
+def test_get_key_press_drops_a_non_bracket_character_after_escape(
+    renderer, monkeypatch
+):
+    # an escape followed by anything but "[" is reported as the escape alone;
+    # the character read after it is consumed rather than handed on
+    monkeypatch.setattr("os.name", "posix")
+
+    chars = iter(["\x1b", "w"])
+
+    class FakeStdin:
+        def read(self, n):
+            return next(chars)
+
+    monkeypatch.setattr("sys.stdin", FakeStdin())
+    monkeypatch.setattr(
+        "select.select", lambda rlist, wlist, xlist, timeout: ([True], [], [])
+    )
+
+    assert renderer.getKeyPress() == "\x1b"
+    assert next(chars, None) is None
+
+
+class FakeMsvcrt:
+    """Stands in for msvcrt, handing out queued bytes one getch() at a time."""
+
+    def __init__(self, keys):
+        self.keys = list(keys)
+
+    def kbhit(self):
+        return bool(self.keys)
+
+    def getch(self):
+        return self.keys.pop(0)
+
+
+def test_get_key_press_on_windows_returns_none_when_no_key_is_waiting(
+    renderer, monkeypatch
+):
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([]))
+
+    assert renderer.getKeyPress() is None
+
+
+def test_get_key_press_on_windows_returns_none_without_msvcrt(renderer, monkeypatch):
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", None)
+
+    assert renderer.getKeyPress() is None
+
+
+def test_get_key_press_on_windows_decodes_a_plain_character(renderer, monkeypatch):
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([b" "]))
+
+    assert renderer.getKeyPress() == " "
+
+
+def test_get_key_press_on_windows_folds_a_shifted_letter_to_its_binding(
+    renderer, monkeypatch
+):
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([b"W", b"W"]))
+
+    assert renderer.readRawKeyPress() == "W"
+    assert renderer.getKeyPress() == "w"
+
+
+@pytest.mark.parametrize("prefix", [b"\xe0", b"\x00"])
+@pytest.mark.parametrize(
+    "scancode, expected",
+    [
+        (b"H", "\x1b[A"),
+        (b"P", "\x1b[B"),
+        (b"M", "\x1b[C"),
+        (b"K", "\x1b[D"),
+    ],
+)
+def test_get_key_press_on_windows_maps_arrow_scancodes_to_escape_sequences(
+    renderer, monkeypatch, prefix, scancode, expected
+):
+    # the same spellings the Unix branch assembles, so the key tables need
+    # only one entry per arrow
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([prefix, scancode]))
+
+    assert renderer.getKeyPress() == expected
