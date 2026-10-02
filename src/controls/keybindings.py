@@ -123,3 +123,27 @@ def buildPygameActionKeys(pygame):
         pygame.K_p: ACTION_OPEN_SHOP,
         pygame.K_SPACE: ACTION_TOGGLE_PAUSE,
     }
+
+
+# How far, in pixels, a touch has to travel between going down and coming
+# up before it counts as a swipe rather than a tap. Below it, the press is
+# read as a tap and aimed from the snake's head instead (see
+# Ophidian.handlePointerGesture).
+SWIPE_THRESHOLD_PIXELS = 30
+
+
+def directionTowards(dx, dy):
+    """The direction a pointer gesture points in, or None for no movement.
+
+    The phone has no keyboard, so a touch is the only way to steer there:
+    a swipe gives the vector it travelled, a tap the vector from the
+    snake's head to the finger. Either is reduced to whichever axis it
+    moved along the most - screen y grows downwards, so a negative dy is
+    up. A tie goes to the horizontal axis, which is only a choice of one
+    over the other for a gesture that is exactly diagonal.
+    """
+    if dx == 0 and dy == 0:
+        return None
+    if abs(dx) >= abs(dy):
+        return DIRECTION_RIGHT if dx > 0 else DIRECTION_LEFT
+    return DIRECTION_DOWN if dy > 0 else DIRECTION_UP

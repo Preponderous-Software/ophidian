@@ -7,6 +7,7 @@ same debt (tests/test_ophidian_pause.py); this is the other thing that stops
 the board.
 """
 
+import asyncio
 import time
 
 from controls.keybindings import RESTART_SENTINEL
@@ -52,11 +53,18 @@ def test_the_pygame_shop_gives_back_the_time_it_took(tmp_path, monkeypatch):
     _freezeClock(monkeypatch, clock)
     game.activePowerUps.activate(PowerUpType.INVINCIBILITY, 3.0)
 
-    monkeypatch.setattr(
-        Ophidian, "runPygameShop", lambda self: clock.__setitem__(0, clock[0] + 30.0)
-    )
+    async def browseForThirtySeconds(self):
+        clock[0] += 30.0
 
+    monkeypatch.setattr(Ophidian, "runPygameShop", browseForThirtySeconds)
+
+    # openShop() only asks for the graphical shop; the run loop then opens
+    # it through visitPygameShop(), which is where the credit is given
     game.openShop()
+    assert game.shopRequested is True
+    asyncio.run(game.visitPygameShop())
+
+    assert game.shopRequested is False
 
     assert game.activePowerUps.remainingSeconds(PowerUpType.INVINCIBILITY) == 3.0
 

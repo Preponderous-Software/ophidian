@@ -17,6 +17,7 @@ from controls.keybindings import (
     TEXT_UI_DIRECTION_KEYS,
     buildPygameActionKeys,
     buildPygameDirectionKeys,
+    directionTowards,
     normalizeTextUiKey,
 )
 
@@ -126,3 +127,23 @@ def test_normalizing_passes_through_keys_that_have_no_case():
     assert normalizeTextUiKey(" ") == " "
     assert normalizeTextUiKey("\x1b") == "\x1b"
     assert normalizeTextUiKey(None) is None
+
+
+@pytest.mark.parametrize(
+    "dx, dy, expected",
+    [
+        (50, 0, DIRECTION_RIGHT),
+        (-50, 0, DIRECTION_LEFT),
+        (0, 50, DIRECTION_DOWN),  # screen y grows downwards
+        (0, -50, DIRECTION_UP),
+        (40, -10, DIRECTION_RIGHT),  # the dominant axis wins
+        (-10, 40, DIRECTION_DOWN),
+        (30, 30, DIRECTION_RIGHT),  # an exact diagonal goes horizontal
+    ],
+)
+def test_direction_towards_reads_the_dominant_axis(dx, dy, expected):
+    assert directionTowards(dx, dy) == expected
+
+
+def test_direction_towards_a_gesture_that_did_not_move_is_none():
+    assert directionTowards(0, 0) is None
