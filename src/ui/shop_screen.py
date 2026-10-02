@@ -1,3 +1,5 @@
+import asyncio
+
 from progression.shop import listUpgrades, purchaseUpgrade
 
 # @author Daniel McCoy Stephenson
@@ -11,7 +13,8 @@ class PygameShopScreen:
     main pygame loop but scoped to just the shop, so purchasing upgrades is
     visible and interactive without ever blocking on stdin behind the
     graphical window (unlike the text-UI shop, which is fine using input()
-    since the console *is* its UI).
+    since the console *is* its UI). Async, like the main pygame loop, so it
+    can run in a browser.
     """
 
     def __init__(self, pygame, graphik, getGameDisplay, config, saveManager, onQuit):
@@ -22,7 +25,7 @@ class PygameShopScreen:
         self.saveManager = saveManager
         self.onQuit = onQuit
 
-    def run(self):
+    async def run(self):
         upgrades = listUpgrades()
         selectedIndex = 0
         shopMessage = None
@@ -52,7 +55,10 @@ class PygameShopScreen:
                         viewingShop = False
             self.draw(upgrades, selectedIndex, shopMessage)
             self.pygame.display.update()
-            self.pygame.time.delay(16)
+            # awaited rather than pygame.time.delay(16), which blocks: in a
+            # browser (pygbag) the page only gets control back - and so only
+            # paints, or delivers the next key - when this yields
+            await asyncio.sleep(0.016)
 
     def draw(self, upgrades, selectedIndex, shopMessage=None):
         gameDisplay = self.getGameDisplay()

@@ -1,4 +1,5 @@
 import os
+import sys
 
 from lib.trace_client import TraceClient, environment_opts_out
 
@@ -47,9 +48,25 @@ FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT = (
 )
 
 
+# What the first run says in the browser build, which never reports.
+FIRST_RUN_NOTICE_OFF_IN_BROWSER = (
+    "Usage reporting is off in the browser build. Details: " + DETAILS_URL
+)
+
+
+def runningInBrowser():
+    """True for a pygbag build running in a web browser. The trace client
+    sends from a thread of its own, and a pygbag build has no threads, so
+    nothing is reported from there at all."""
+    return sys.platform == "emscripten"
+
+
 def firstRunNotice():
     """The line the first run prints: FIRST_RUN_NOTICE, unless the
-    environment has already opted out of usage reporting."""
+    environment has already opted out of usage reporting, or this is the
+    browser build, which never reports."""
+    if runningInBrowser():
+        return FIRST_RUN_NOTICE_OFF_IN_BROWSER
     if environment_opts_out():
         return FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT
     return FIRST_RUN_NOTICE
@@ -98,7 +115,13 @@ def createUsageReporter(settings, version=None):
     DO_NOT_TRACK environment variables before anything in the block and
     records why it is off in disabled_reason ("environment", "config" or
     "no key").
+
+    The browser build always gets the no-op client (runningInBrowser).
     """
+    if runningInBrowser():
+        # before TraceClient is built at all: an enabled client would start
+        # its sending thread, which a pygbag build cannot run
+        return TraceClient.disabled()
     if not isinstance(settings, dict):
         settings = {}
         enabled = False

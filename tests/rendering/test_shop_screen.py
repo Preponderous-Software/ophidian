@@ -1,3 +1,5 @@
+import asyncio
+
 import pygame
 import pytest
 from conftest import regionHasNonBackgroundPixel
@@ -69,9 +71,8 @@ def test_draw_shows_purchase_confirmation_message(pygameGame):
     assert regionHasNonBackgroundPixel(game.gameDisplay, messageBand, game.config.black)
 
 
-def test_run_navigates_purchases_and_exits_on_escape(pygameGame, monkeypatch):
+def test_run_navigates_purchases_and_exits_on_escape(pygameGame):
     game = pygameGame
-    monkeypatch.setattr(game.pygame.time, "delay", lambda ms: None)
     screen = _makeShopScreen(game)
     upgrades = listUpgrades()
     game.saveManager.data["currency"] = 100
@@ -83,16 +84,15 @@ def test_run_navigates_purchases_and_exits_on_escape(pygameGame, monkeypatch):
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
 
-    screen.run()
+    asyncio.run(screen.run())
 
     purchased = upgrades[1]
     assert purchased["id"] in game.saveManager.data["purchasedUpgrades"]
     assert game.saveManager.data["currency"] == 100 - purchased["cost"]
 
 
-def test_run_does_not_purchase_when_already_owned(pygameGame, monkeypatch):
+def test_run_does_not_purchase_when_already_owned(pygameGame):
     game = pygameGame
-    monkeypatch.setattr(game.pygame.time, "delay", lambda ms: None)
     screen = _makeShopScreen(game)
     upgrades = listUpgrades()
     game.saveManager.data["currency"] = 100
@@ -101,7 +101,7 @@ def test_run_does_not_purchase_when_already_owned(pygameGame, monkeypatch):
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
 
-    screen.run()
+    asyncio.run(screen.run())
 
     assert game.saveManager.data["purchasedUpgrades"] == [upgrades[0]["id"]]
     assert game.saveManager.data["currency"] == 100
@@ -123,6 +123,6 @@ def test_run_calls_onQuit_on_quit_event(pygameGame):
     pygame.event.post(pygame.event.Event(pygame.QUIT))
 
     with pytest.raises(SystemExit):
-        screen.run()
+        asyncio.run(screen.run())
 
     assert quitCalled

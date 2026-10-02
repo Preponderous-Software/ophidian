@@ -1,5 +1,8 @@
+import asyncio
 import math
+import os
 import random
+import sys
 import time
 from config.config import Config
 from lib.pyenvlib.entity import Entity
@@ -58,12 +61,13 @@ from controls.keybindings import (
     ACTION_TOGGLE_TICK_SPEED_LIMIT,
     OPPOSITE_DIRECTIONS,
     RESTART_SENTINEL,
+    SWIPE_THRESHOLD_PIXELS,
     TEXT_UI_ACTION_KEYS,
     TEXT_UI_DIRECTION_KEYS,
     buildPygameActionKeys,
     buildPygameDirectionKeys,
+    directionTowards,
 )
-
 
 # Geometry of one power-up indicator in the graphical HUD: a label row with
 # a duration meter tucked underneath it. The row is taller than the plain
@@ -79,6 +83,18 @@ POWER_UP_INDICATOR_METER_HEIGHT = 4
 OBITUARY_FONT_NAME = "freesansbold.ttf"
 OBITUARY_FONT_SIZE = 18
 OBITUARY_SCREEN_MARGIN = 20
+
+# The window icon, found next to this file rather than through the working
+# directory, so the game starts the same from the repository root (run.sh),
+# from src/, and from the browser build, whose root is src/ itself.
+ICON_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "media", "icon.PNG"
+)
+
+# True when running as a pygbag build in a web browser. There is no window
+# to close and no process to quit there - the tab is closed instead - so the
+# quit key is not bound in the browser (see initializeKeyBindings).
+RUNNING_IN_BROWSER = sys.platform == "emscripten"
 
 
 # @author Daniel McCoy Stephenson
@@ -97,7 +113,7 @@ class Ophidian:
 
             pygame.init()
             self.initializeGameDisplay()
-            pygame.display.set_icon(pygame.image.load("src/media/icon.PNG"))
+            pygame.display.set_icon(pygame.image.load(ICON_PATH))
             self.graphik = Graphik(self.gameDisplay)
         else:
             from textui.textrenderer import TextRenderer
@@ -125,6 +141,13 @@ class Ophidian:
         # which clears them for the starting run
         self.activePowerUps = ActivePowerUps()
         self.tickSpeedBeforeBoost = None
+        # see holdFrame(): set only while the async pygame loop is running
+        self.deferFrameHolds = False
+        self.heldFrames = []
+        # see openShop(): the graphical shop is opened by the async loop
+        self.shopRequested = False
+        # where the current touch/mouse press went down (handlePointerGesture)
+        self.pointerDownAt = None
         self.initialize()
         self.tick = 0
         self.score = 0
@@ -521,9 +544,39 @@ class Ophidian:
                 self.config.white,
             )
         self.pygame.display.update()
-        time.sleep(1.5)
+        self.holdFrame(1.5)
+
+    def holdFrame(self, seconds):
+        """Leaves what was just presented on screen for `seconds`.
+
+        Outside the async pygame loop (the text UI, tests, and the obituary
+        shown on the way out of the desktop game) this is a plain sleep. In
+        the loop it must not block: a browser only paints a canvas once
+        control returns to it, so a sleep there would freeze the tab and
+        show none of the frames being held. The loop is given a copy of the
+        frame instead and replays it, for the same length of time and in the
+        same order, before it draws the next one (replayHeldFrames) - so
+        the collision frame and the obituary screen are still shown one
+        after the other, on the desktop and in the browser alike.
+        """
+        if self.deferFrameHolds:
+            self.heldFrames.append((self.gameDisplay.copy(), seconds))
+        else:
+            time.sleep(seconds)
+
+    async def replayHeldFrames(self):
+        """Presents the frames holdFrame() set aside, each for as long as
+        it asked to be held, yielding to the event loop throughout."""
+        while self.heldFrames:
+            frame, seconds = self.heldFrames.pop(0)
+            self.gameDisplay.blit(frame, (0, 0))
+            self.pygame.display.update()
+            await asyncio.sleep(seconds)
 
     def quitApplication(self):
+        # leaving: nothing will replay a deferred frame, so the obituary is
+        # held for real (see holdFrame)
+        self.deferFrameHolds = False
         if not self.collision:
             self.recordCurrentRun("quit")
             self.renderObituaryScreen()
@@ -597,7 +650,7 @@ class Ophidian:
                 print("The ophidian collides with itself and ceases to be.")
                 self.recordCurrentRun("collision", presentedByRenderer=True)
                 self.renderCollisionFrame()
-                time.sleep(self.config.tickSpeed * 20)
+                self.holdFrame(self.config.tickSpeed * 20)
                 if not self.config.useTextUI:
                     self.renderObituaryScreen()
                 if self.config.restartUponCollision:
@@ -686,12 +739,28 @@ class Ophidian:
         Either one blocks the run loop for as long as the player browses, so
         the time that costs is measured here and given back to the power-up
         timers afterwards - see restorePowerUpTimeSpentAway.
+
+        The graphical shop is a loop of its own that has to yield to the
+        event loop every frame (it is async so it can run in a browser), and
+        a key press is handled synchronously, so in pygame mode this only
+        asks for it: the run loop opens it before the next frame
+        (visitPygameShop). The key still returns RESTART_SENTINEL, so that
+        frame does not advance the snake either way.
         """
-        openedAt = time.time()
         if self.config.useTextUI:
+            openedAt = time.time()
             self.openTextShop()
+            self.restorePowerUpTimeSpentAway(openedAt)
         else:
-            self.runPygameShop()
+            self.shopRequested = True
+
+    async def visitPygameShop(self):
+        """Runs the graphical shop the player asked for, and gives running
+        power-ups back the time it took, as openShop() does for the text
+        shop."""
+        self.shopRequested = False
+        openedAt = time.time()
+        await self.runPygameShop()
         self.restorePowerUpTimeSpentAway(openedAt)
 
     def restorePowerUpTimeSpentAway(self, leftAt):
@@ -749,11 +818,11 @@ class Ophidian:
         finally:
             self.textRenderer.enableRawMode()
 
-    def runPygameShop(self):
+    async def runPygameShop(self):
         """Delegates to PygameShopScreen: its own poll/handle/draw loop,
         scoped to just the shop, so purchasing upgrades stays visible and
         interactive without blocking on stdin behind the graphical window."""
-        PygameShopScreen(
+        await PygameShopScreen(
             self.pygame,
             self.graphik,
             lambda: self.gameDisplay,
@@ -779,6 +848,14 @@ class Ophidian:
         else:
             self.directionKeys = buildPygameDirectionKeys(self.pygame)
             self.actionKeys = buildPygameActionKeys(self.pygame)
+            if RUNNING_IN_BROWSER:
+                # nothing to quit to in a browser tab: the key would only
+                # leave a dead canvas behind
+                self.actionKeys = {
+                    key: action
+                    for key, action in self.actionKeys.items()
+                    if action != ACTION_QUIT
+                }
 
     def handleKeyDownEvent(self, key):
         """Turns one key press into the gameplay rule it stands for.
@@ -799,6 +876,31 @@ class Ophidian:
         if action is None:
             return None
         return self.performAction(action)
+
+    def handlePointerGesture(self, downAt, upAt):
+        """Steers the snake from a touch (or mouse) press, for a phone,
+        which has no keyboard.
+
+        A press that travelled at least SWIPE_THRESHOLD_PIXELS is a swipe
+        and steers the way it travelled. A shorter one is a tap and steers
+        towards where it landed, measured from the middle of the snake's
+        head. Either goes through setDirectionIfAllowed, so a gesture is
+        bound by exactly the rules a direction key is: no reversing into
+        the neck, one turn per tick.
+        """
+        dx = upAt[0] - downAt[0]
+        dy = upAt[1] - downAt[1]
+        if math.hypot(dx, dy) < SWIPE_THRESHOLD_PIXELS:
+            headLocation = self.getLocation(self.selectedSnakePart)
+            if headLocation == -1:
+                return
+            headX = (headLocation.getX() + 0.5) * self.locationWidth
+            headY = (headLocation.getY() + 0.5) * self.locationHeight
+            dx = upAt[0] - headX
+            dy = upAt[1] - headY
+        direction = directionTowards(dx, dy)
+        if direction is not None:
+            self.setDirectionIfAllowed(direction)
 
     def setDirectionIfAllowed(self, direction):
         """Turns the snake, unless the turn is one of the two that are not
@@ -1156,12 +1258,31 @@ class Ophidian:
         It sleeps regardless of limitTickSpeed, since a held game has no
         reason to spin the processor at full speed (issue #130).
         """
+        delay = self.tickDelay()
+        if delay:
+            time.sleep(delay)
+        self.advanceTick()
+
+    def tickDelay(self):
+        """How long endOfTick waits: the tick speed while the run is held
+        or the tick limit is on, otherwise nothing."""
         if self.paused or self.config.limitTickSpeed:
-            time.sleep(self.config.tickSpeed)
+            return self.config.tickSpeed
+        return 0
+
+    def advanceTick(self):
+        """endOfTick's bookkeeping, apart from its wait, so the async pygame
+        loop can await the wait instead of blocking on it."""
         if self.paused:
             return
         self.tick += 1
         self.changedDirectionThisTick = False
+
+    async def endOfTickAsync(self):
+        """endOfTick for the async pygame loop: the same wait, awaited, so
+        a browser gets control back every frame (even at a delay of 0)."""
+        await asyncio.sleep(self.tickDelay())
+        self.advanceTick()
 
     def moveSelectedSnakePart(self):
         """The one movement step of a tick, shared by both UI loops.
@@ -1177,7 +1298,7 @@ class Ophidian:
         if self.config.useTextUI:
             self.runTextUI()
         else:
-            self.runPygameUI()
+            asyncio.run(self.runPygameUI())
 
     def runTextUI(self):
         """Run the game with text-based UI"""
@@ -1231,8 +1352,21 @@ class Ophidian:
 
         self.quitApplication()
 
-    def runPygameUI(self):
-        """Run the game with pygame graphical UI"""
+    async def runPygameUI(self):
+        """Run the game with pygame graphical UI.
+
+        Async so the same loop runs as a pygbag build in a browser, which
+        needs control back once a frame: every wait in it is awaited
+        rather than slept (endOfTickAsync, replayHeldFrames, the shop).
+        """
+        self.deferFrameHolds = True
+        try:
+            await self.runPygameFrames()
+        finally:
+            self.deferFrameHolds = False
+        self.quitApplication()
+
+    async def runPygameFrames(self):
         while self.running:
             # mirrors runTextUI: nothing about a held run ages, and both
             # loops have to agree on that as much as on anything else
@@ -1254,9 +1388,24 @@ class Ophidian:
                         restarted = True
                 elif event.type == self.pygame.WINDOWRESIZED:
                     self.initializeLocationWidthAndHeight()
+                elif event.type == self.pygame.MOUSEBUTTONDOWN:
+                    # a touch arrives as a mouse press as well, in a
+                    # browser and on the desktop alike
+                    self.pointerDownAt = event.pos
+                elif event.type == self.pygame.MOUSEBUTTONUP:
+                    if self.pointerDownAt is not None:
+                        self.handlePointerGesture(self.pointerDownAt, event.pos)
+                    self.pointerDownAt = None
+
+            if self.shopRequested:
+                await self.visitPygameShop()
 
             if not restarted and not self.paused:
                 self.moveSelectedSnakePart()
+
+            # a run that just ended set its collision frame and obituary
+            # aside rather than sleeping on them (see holdFrame)
+            await self.replayHeldFrames()
 
             self.gameDisplay.fill(self.config.white)
             self.drawEnvironment()
@@ -1292,9 +1441,7 @@ class Ophidian:
             self.drawPauseNotice()
             self.pygame.display.update()
 
-            self.endOfTick()
-
-        self.quitApplication()
+            await self.endOfTickAsync()
 
 
 import argparse

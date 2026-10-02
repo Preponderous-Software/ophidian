@@ -1,0 +1,46 @@
+name: Browser build
+
+# Builds the pygbag (WebAssembly) version of the game from src/, whose
+# main.py is the browser entry point, and deploys it to arcade as the static
+# site at https://ophidian.play.danielstephenson.dev. Pull requests only
+# build; a deploy needs a manual run or ARCADE_ENABLED=true on a push.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pygbag
+        run: pip install pygbag==0.9.3
+
+      - name: Build with pygbag
+        run: python -m pygbag --build --title Ophidian src
+
+      - name: Check the build has an index page
+        run: test -f src/build/web/index.html
+
+      - name: Write the deployed version
+        run: echo "$(cat version.txt)+g${GITHUB_SHA::7}" > web-version.txt
+
+      - name: Deploy to arcade
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && vars.ARCADE_ENABLED == 'true')
+        uses: Stephenson-Software/arcade-deploy@v1
+        with:
+          slug: ophidian
+          token: ${{ secrets.ARCADE_TOKEN }}
+          site-dir: src/build/web
+          version-file: web-version.txt

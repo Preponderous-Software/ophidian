@@ -6,3 +6,6 @@ save.json
 # coverage artifacts left behind by test.sh
 .coverage
 cov.xml
+# pygbag browser build output (see .github/workflows/browser.yml)
+src/build/
+web-version.txt

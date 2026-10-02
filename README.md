@@ -1,6 +1,21 @@
 # Ophidian
 This game allows you to control an ever-increasingly growing ophidian in a virtual environment. 
 
+## Play in your browser
+Ophidian also runs in a web browser, phones included, with nothing to install:
+
+- https://ophidian.play.danielstephenson.dev
+- https://danielstephenson.dev/play (every browser game in one place)
+
+Click or tap the page once to start it. On a phone, swipe to steer, or tap a
+spot on the board to turn towards it. The browser build is the graphical UI
+built with [pygbag](https://github.com/pygame-web/pygbag) from `src/`, whose
+`main.py` is its entry point (`python -m pygbag --build src` builds it into
+`src/build/web`); `.github/workflows/browser.yml` builds it on every pull request
+and deploys it. Two things differ there: progress (`save.json`) lasts only as
+long as the tab, and no usage reporting is sent at all. There is no quit key, as
+closing the tab ends the game.
+
 ## Requirements
 - Python 3.8 or newer (developed and tested on 3.10)
 - [pygame](https://www.pygame.org/) — only for the graphical UI; `--text-ui` runs without it
@@ -90,6 +105,7 @@ c | cycle selected cosmetic skin
 p | open the upgrade shop
 r | restart
 q | quit
+swipe / tap | steer: a swipe turns the way it travelled, a tap turns towards where it landed (graphical UI, mouse or touch)
 
 Letter keys are matched regardless of case in either UI, so the controls keep working
 with Caps Lock on.

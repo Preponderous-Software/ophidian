@@ -115,14 +115,22 @@ def test_pygame_q_key_stops_the_game(pygameGame):
 
 
 def test_pygame_p_key_opens_shop_and_signals_restart(pygameGame, monkeypatch):
+    # the graphical shop is an async loop of its own, so the key only asks
+    # for it and the run loop opens it before the next frame - see
+    # tests/rendering/test_pygame_run_loop.py for that half
     game = pygameGame
     calls = []
-    monkeypatch.setattr(game, "runPygameShop", lambda: calls.append("shop"))
+
+    async def recordShop():
+        calls.append("shop")
+
+    monkeypatch.setattr(game, "runPygameShop", recordShop)
 
     result = game.handleKeyDownEvent(pygame.K_p)
 
-    assert calls == ["shop"]
+    assert game.shopRequested is True
     assert result == "restart"
+    assert calls == []
 
 
 def test_pygame_r_key_reinitializes_level_and_signals_restart(pygameGame, monkeypatch):
@@ -159,3 +167,20 @@ def test_pygame_c_key_cycles_selected_cosmetic(pygameGame, monkeypatch):
     game.handleKeyDownEvent(pygame.K_c)
 
     assert calls == ["cycle"]
+
+
+def test_the_quit_key_is_not_bound_in_the_browser(pygameGame, monkeypatch):
+    # a browser tab has nothing to quit to, so q would only leave a dead
+    # canvas; every other key keeps its binding
+    import ophidian
+
+    game = pygameGame
+    monkeypatch.setattr(ophidian, "RUNNING_IN_BROWSER", True)
+
+    game.initializeKeyBindings()
+    game.running = True
+    game.handleKeyDownEvent(pygame.K_q)
+
+    assert game.running is True
+    assert pygame.K_q not in game.actionKeys
+    assert pygame.K_p in game.actionKeys

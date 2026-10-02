@@ -226,3 +226,17 @@ def test_first_run_notice_says_off_when_the_environment_opted_out(monkeypatch):
         "Usage reporting is off (environment)"
     )
     assert DETAILS_URL in FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT
+
+
+def test_the_browser_build_never_reports_and_starts_no_thread(monkeypatch):
+    # a pygbag build cannot run the client's sending thread, so even a block
+    # that says on yields the no-op client there
+    monkeypatch.setattr(usage.sys, "platform", "emscripten")
+    threadsBefore = threading.active_count()
+
+    reporter = createUsageReporter(defaultUsageReportingSettings())
+
+    assert reporter.enabled is False
+    assert threading.active_count() == threadsBefore
+    reporter.report("startup")  # still returns at once and never raises
+    assert firstRunNotice() == usage.FIRST_RUN_NOTICE_OFF_IN_BROWSER
