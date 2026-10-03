@@ -16,6 +16,7 @@ from reporting.usage import (
     createUsageReporter,
     defaultUsageReportingSettings,
     firstRunNotice,
+    installIdFile,
     readVersion,
 )
 
@@ -91,7 +92,10 @@ def test_missing_or_empty_version_file_means_an_unknown_version(tmp_path, monkey
         reporter.close()
     finally:
         server.shutdown()
-    assert received["body"]["tags"] == {"version": UNKNOWN_VERSION}
+    assert received["body"]["tags"] == {
+        "version": UNKNOWN_VERSION,
+        "install": reporter.install_id,
+    }
     assert UNKNOWN_VERSION == "unknown"
 
 
@@ -132,8 +136,10 @@ def test_enabled_settings_report_under_the_program_name_to_the_configured_endpoi
     assert received["body"] == {
         "application": "ophidian",
         "name": "startup",
-        "tags": {"version": "9.9.9"},
+        "tags": {"version": "9.9.9", "install": reporter.install_id},
     }
+    with open(installIdFile()) as f:
+        assert f.readline().strip() == reporter.install_id
 
 
 def test_every_event_carries_the_version_from_version_txt():
@@ -153,8 +159,63 @@ def test_every_event_carries_the_version_from_version_txt():
     assert received["body"] == {
         "application": "ophidian",
         "name": "run-ended",
-        "tags": {"cause": "quit", "version": readVersion()},
+        "tags": {
+            "cause": "quit",
+            "version": readVersion(),
+            "install": reporter.install_id,
+        },
     }
+
+
+def test_the_installation_id_is_kept_under_the_user_data_dir_and_reused(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(usage.sys, "platform", "linux")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    settings = {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": "k"}
+    first = createUsageReporter(settings)
+    second = createUsageReporter(settings)
+    first.close()
+    second.close()
+    path = tmp_path / "xdg" / "ophidian" / "trace-install-id"
+    assert first.install_id and first.install_id == path.read_text().strip()
+    assert second.install_id == first.install_id
+
+
+def test_trace_install_id_wins_over_the_file(monkeypatch):
+    monkeypatch.setenv("TRACE_INSTALL_ID", "pinned-id")
+    reporter = createUsageReporter(
+        {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": "k"}
+    )
+    reporter.close()
+    assert reporter.install_id == "pinned-id"
+    assert not os.path.exists(installIdFile())
+
+
+def test_no_installation_id_file_when_reporting_is_off(monkeypatch):
+    createUsageReporter({"enabled": False, "endpoint": DEFAULT_ENDPOINT, "key": "k"})
+    monkeypatch.setenv("DO_NOT_TRACK", "1")
+    createUsageReporter({"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": "k"})
+    monkeypatch.delenv("DO_NOT_TRACK")
+    monkeypatch.setenv("TRACE_USAGE_REPORTING", "off")
+    createUsageReporter({"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": "k"})
+    assert not os.path.exists(installIdFile())
+
+
+def test_installation_id_file_follows_the_platform(monkeypatch):
+    monkeypatch.setenv("HOME", "/h")
+    monkeypatch.setenv("APPDATA", "/appdata")
+    monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    monkeypatch.setattr(usage.sys, "platform", "linux")
+    assert installIdFile() == os.path.join(
+        "/h", ".local", "share", "ophidian", "trace-install-id"
+    )
+    monkeypatch.setattr(usage.sys, "platform", "darwin")
+    assert installIdFile() == os.path.join(
+        "/h", "Library", "Application Support", "ophidian", "trace-install-id"
+    )
+    monkeypatch.setattr(usage.sys, "platform", "win32")
+    assert installIdFile() == os.path.join("/appdata", "ophidian", "trace-install-id")
 
 
 def test_disabled_reason_says_why_the_reporter_sends_nothing():

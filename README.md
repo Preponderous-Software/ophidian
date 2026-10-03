@@ -140,6 +140,15 @@ No usernames, hostnames, IP addresses, paths, save contents or scores are ever s
 happens on a background thread, never delays a frame, and never stops the game if the
 server is unreachable.
 
+Every event also carries a random installation ID (the tag `install`) so installations can be
+counted rather than events. It is a random UUID kept in a file named `trace-install-id` in the
+user data directory: `~/.local/share/ophidian/` on Linux (or `$XDG_DATA_HOME/ophidian/`),
+`~/Library/Application Support/ophidian/` on macOS and `%APPDATA%\ophidian\` on Windows. It
+identifies no person, account or address; delete the file to get a new one. Setting the
+environment variable `TRACE_INSTALL_ID` sends that value instead and leaves the file alone.
+The file is only created while reporting is on, so every opt-out below also stops it, and the
+browser build (which never reports) has none.
+
 The first time the game starts it says so once on the console and writes a `usageReporting`
 block to `save.json` (created next to where the game is run):
 ```json

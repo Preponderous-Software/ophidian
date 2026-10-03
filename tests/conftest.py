@@ -17,7 +17,7 @@ import ophidian
 
 
 @pytest.fixture(autouse=True)
-def _neverReportUsageFromTests(monkeypatch):
+def _neverReportUsageFromTests(monkeypatch, tmp_path):
     """Keeps the suite off the production trace server.
 
     Reporting is on by default, so every Ophidian(...) a test builds would
@@ -34,6 +34,11 @@ def _neverReportUsageFromTests(monkeypatch):
     # it needs.
     monkeypatch.delenv("TRACE_USAGE_REPORTING", raising=False)
     monkeypatch.delenv("DO_NOT_TRACK", raising=False)
+    monkeypatch.delenv("TRACE_INSTALL_ID", raising=False)
+    # An enabled reporter keeps its installation ID under the user data dir;
+    # point every candidate for that dir into the test's own tmp_path.
+    for variable in ("HOME", "USERPROFILE", "APPDATA", "XDG_DATA_HOME"):
+        monkeypatch.setenv(variable, str(tmp_path / "userdata"))
 
     realUrlopen = urllib.request.urlopen
 

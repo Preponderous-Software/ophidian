@@ -32,9 +32,9 @@ DETAILS_URL = "https://github.com/Stephenson-Software/trace#usage-reporting"
 # the banner is a single 30px line and this would not fit.
 FIRST_RUN_NOTICE = (
     "Usage reporting is on: ophidian sends a startup event (program name and "
-    "version only) and a run-ended event (how the run ended and the version "
-    "only) to "
-    "https://trace.danielstephenson.dev - nothing about you or your machine. "
+    "version) and a run-ended event (how the run ended and the version), each "
+    "with a random installation ID, to "
+    "https://trace.danielstephenson.dev - nothing about you. "
     'Turn it off with "usageReporting": {"enabled": false} in save.json, or '
     "for every trace-reporting program with the environment variable "
     "TRACE_USAGE_REPORTING=off. Details: " + DETAILS_URL
@@ -82,6 +82,26 @@ def defaultUsageReportingSettings():
     }
 
 
+def installIdFile():
+    """Where this installation's random ID (the tag ``install`` on every
+    event) is kept: ``<user data dir>/ophidian/trace-install-id``, the user
+    data dir being %APPDATA% on Windows, ~/Library/Application Support on
+    macOS and $XDG_DATA_HOME (or ~/.local/share) elsewhere. The client only
+    reads or creates it when reporting is on; deleting it resets the ID."""
+    home = os.path.expanduser("~")
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA", "").strip() or os.path.join(
+            home, "AppData", "Roaming"
+        )
+    elif sys.platform == "darwin":
+        base = os.path.join(home, "Library", "Application Support")
+    else:
+        base = os.environ.get("XDG_DATA_HOME", "").strip() or os.path.join(
+            home, ".local", "share"
+        )
+    return os.path.join(base, APPLICATION.lower(), "trace-install-id")
+
+
 # What every event carries as its version when version.txt is missing or
 # empty: the client requires a non-blank version, and a missing file must
 # never stop the game from starting.
@@ -103,7 +123,10 @@ def createUsageReporter(settings, version=None):
     """Builds the client the game reports through, from the usageReporting
     block of the save data. Every event it sends carries ``version`` (by
     default the one in version.txt, or UNKNOWN_VERSION without one) as the
-    tag ``version``.
+    tag ``version``, and a random installation ID as the tag ``install``:
+    the TRACE_INSTALL_ID environment variable when set, otherwise the one
+    kept in installIdFile(). The client resolves both only after its own
+    opt-out checks, so a disabled reporter never creates the file.
 
     Every path through here yields a client whose report() returns at once
     and never raises, so nothing about reporting can stop a run: a block
@@ -136,6 +159,14 @@ def createUsageReporter(settings, version=None):
     if not isinstance(version, str) or not version.strip():
         version = readVersion() or UNKNOWN_VERSION
     try:
-        return TraceClient(endpoint, APPLICATION, version, key=key, enabled=enabled)
+        return TraceClient(
+            endpoint,
+            APPLICATION,
+            version,
+            key=key,
+            enabled=enabled,
+            install_id=os.environ.get("TRACE_INSTALL_ID"),
+            install_id_file=installIdFile(),
+        )
     except ValueError:
         return TraceClient.disabled()
