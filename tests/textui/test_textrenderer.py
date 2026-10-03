@@ -455,3 +455,27 @@ def test_get_key_press_on_windows_maps_arrow_scancodes_to_escape_sequences(
     monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([prefix, scancode]))
 
     assert renderer.getKeyPress() == expected
+
+
+@pytest.mark.parametrize(
+    "prefix, scancode",
+    [
+        (b"\xe0", b"Q"),  # Page Down - would otherwise quit
+        (b"\xe0", b"R"),  # Insert - would otherwise restart the run
+        (b"\xe0", b"S"),  # Delete - would otherwise move down
+        (b"\x00", b"C"),  # F9 - would otherwise cycle the cosmetic
+        (b"\x00", b"D"),  # F10 - would otherwise move right
+        (b"\x00", b"A"),  # F7 - must not pass for the Up arrow either
+    ],
+)
+def test_get_key_press_on_windows_drops_non_arrow_extended_keys(
+    renderer, monkeypatch, prefix, scancode
+):
+    monkeypatch.setattr("os.name", "nt")
+    monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([prefix, scancode]))
+
+    key = renderer.getKeyPress()
+    # restore os.name before asserting: pytest cannot build its failure
+    # report while os.name claims to be "nt" on a non-Windows host
+    monkeypatch.undo()
+    assert key is None

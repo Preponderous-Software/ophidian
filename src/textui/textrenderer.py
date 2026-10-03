@@ -261,6 +261,11 @@ class TextRenderer:
                         b"M": "\x1b[C",  # Right
                         b"K": "\x1b[D",  # Left
                     }
-                    return arrow_map.get(ch2, ch2.decode("utf-8", errors="ignore"))
+                    # Any other extended key (Page Down, Insert, F9...) is
+                    # dropped: its scancode is a plain letter, and handing
+                    # that on would let Page Down ("Q") quit the game. It is
+                    # not spelled "\x1b[" + scancode either, since F7 ("A")
+                    # would then read as the Up arrow (see issue #149).
+                    return arrow_map.get(ch2)
                 return ch.decode("utf-8", errors="ignore")
         return None
