@@ -1,4 +1,7 @@
 # Ophidian
+
+[![Play in your browser](https://img.shields.io/badge/Play-in%20your%20browser-2ea44f)](https://danielstephenson.dev/play/ophidian)
+
 This game allows you to control an ever-increasingly growing ophidian in a virtual environment. 
 
 ## Play in your browser
