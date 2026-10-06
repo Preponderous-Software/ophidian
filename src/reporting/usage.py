@@ -24,7 +24,7 @@ VERSION_FILE = os.path.join(
 )
 
 # Where what is sent, what is not, and every opt-out are written up.
-DETAILS_URL = "https://github.com/Stephenson-Software/trace#usage-reporting"
+DETAILS_URL = "https://danielstephenson.dev/usage-reporting"
 
 # Shown once, the first time the game starts with a save that predates the
 # usageReporting block (or with no save at all); SaveManager then writes the
