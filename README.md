@@ -127,7 +127,7 @@ and the text UI prints a collision notice under the board, followed by the obitu
 
 ## Usage reporting
 Usage reporting is on by default: Ophidian sends its name (`ophidian`), the version in
-`version.txt` and two kinds of event to [trace](https://github.com/Stephenson-Software/trace)
+`version.txt` and two kinds of event to [trace](https://danielstephenson.dev/usage-reporting)
 at `https://trace.danielstephenson.dev`, so that its maintainers can see the game is still
 played:
 
@@ -170,7 +170,7 @@ The environment variables win over `save.json`. `endpoint` is where events are p
 is a vendored copy of [trace-client-python](https://github.com/Stephenson-Software/trace-client-python)
 at `src/lib/trace_client.py`, and the test suite never contacts the real server.
 
-Details: https://github.com/Stephenson-Software/trace#usage-reporting
+Details: https://danielstephenson.dev/usage-reporting
 
 ## Support
 You can find the support discord server [here](https://discord.gg/49J4RHQxhy).

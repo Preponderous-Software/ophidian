@@ -275,7 +275,7 @@ def test_first_run_notice_is_one_line_and_names_every_switch():
     assert '"usageReporting": {"enabled": false} in save.json' in FIRST_RUN_NOTICE
     assert "TRACE_USAGE_REPORTING=off" in FIRST_RUN_NOTICE
     assert DETAILS_URL in FIRST_RUN_NOTICE
-    assert DETAILS_URL == "https://github.com/Stephenson-Software/trace#usage-reporting"
+    assert DETAILS_URL == "https://danielstephenson.dev/usage-reporting"
 
 
 def test_first_run_notice_says_off_when_the_environment_opted_out(monkeypatch):
