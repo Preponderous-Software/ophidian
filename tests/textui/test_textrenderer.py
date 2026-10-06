@@ -409,21 +409,29 @@ def test_get_key_press_on_windows_returns_none_when_no_key_is_waiting(
     monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([]))
 
-    assert renderer.getKeyPress() is None
+    key = renderer.getKeyPress()
+    # restore os.name before asserting: pytest cannot build its failure
+    # report while os.name claims to be "nt" on a non-Windows host
+    monkeypatch.undo()
+    assert key is None
 
 
 def test_get_key_press_on_windows_returns_none_without_msvcrt(renderer, monkeypatch):
     monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr("textui.textrenderer.msvcrt", None)
 
-    assert renderer.getKeyPress() is None
+    key = renderer.getKeyPress()
+    monkeypatch.undo()
+    assert key is None
 
 
 def test_get_key_press_on_windows_decodes_a_plain_character(renderer, monkeypatch):
     monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([b" "]))
 
-    assert renderer.getKeyPress() == " "
+    key = renderer.getKeyPress()
+    monkeypatch.undo()
+    assert key == " "
 
 
 def test_get_key_press_on_windows_folds_a_shifted_letter_to_its_binding(
@@ -432,8 +440,11 @@ def test_get_key_press_on_windows_folds_a_shifted_letter_to_its_binding(
     monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([b"W", b"W"]))
 
-    assert renderer.readRawKeyPress() == "W"
-    assert renderer.getKeyPress() == "w"
+    rawKey = renderer.readRawKeyPress()
+    key = renderer.getKeyPress()
+    monkeypatch.undo()
+    assert rawKey == "W"
+    assert key == "w"
 
 
 @pytest.mark.parametrize("prefix", [b"\xe0", b"\x00"])
@@ -454,7 +465,9 @@ def test_get_key_press_on_windows_maps_arrow_scancodes_to_escape_sequences(
     monkeypatch.setattr("os.name", "nt")
     monkeypatch.setattr("textui.textrenderer.msvcrt", FakeMsvcrt([prefix, scancode]))
 
-    assert renderer.getKeyPress() == expected
+    key = renderer.getKeyPress()
+    monkeypatch.undo()
+    assert key == expected
 
 
 @pytest.mark.parametrize(
