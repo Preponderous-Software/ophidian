@@ -144,3 +144,79 @@ def test_opt_out_survives_reload_and_keeps_the_default_endpoint_and_key(tmp_path
     assert (
         reloaded.data["usageReporting"]["key"] == defaultUsageReportingSettings()["key"]
     )
+
+
+def test_corrupt_save_file_falls_back_to_defaults_and_owes_the_notice(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        f.write('{"currency": 40, ')
+
+    manager = SaveManager(path)
+
+    assert manager.data == defaultSaveData()
+    assert manager.usageReportingNoticeDue is True
+
+
+def test_corrupt_save_file_is_overwritten_by_the_next_save(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        f.write("not json")
+
+    manager = SaveManager(path)
+    manager.data["currency"] = 3
+    manager.save()
+
+    with open(path) as f:
+        assert json.load(f)["currency"] == 3
+
+
+def test_save_file_holding_a_non_object_is_ignored(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        json.dump([{"currency": 40}], f)
+
+    manager = SaveManager(path)
+
+    assert manager.data == defaultSaveData()
+    assert manager.usageReportingNoticeDue is True
+
+
+def test_unreadable_save_path_falls_back_to_defaults(tmp_path):
+    # a directory at the save path exists but cannot be opened as a file,
+    # which raises an OSError rather than a JSON error
+    path = os.path.join(tmp_path, "save.json")
+    os.mkdir(path)
+
+    manager = SaveManager(path)
+
+    assert manager.data == defaultSaveData()
+
+
+def test_stale_lifetime_stats_keep_their_values_and_gain_missing_keys(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    old = defaultSaveData()
+    old["lifetimeStats"] = {"totalRuns": 9, "highestScore": 120}
+    with open(path, "w") as f:
+        json.dump(old, f)
+
+    stats = SaveManager(path).data["lifetimeStats"]
+
+    assert stats["totalRuns"] == 9
+    assert stats["highestScore"] == 120
+    assert stats["totalFoodEaten"] == 0
+    assert stats["highestLevelReached"] == 1
+    assert set(stats) == set(defaultSaveData()["lifetimeStats"])
+
+
+def test_non_object_usage_reporting_is_replaced_by_the_defaults(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    old = defaultSaveData()
+    old["usageReporting"] = False
+    with open(path, "w") as f:
+        json.dump(old, f)
+
+    manager = SaveManager(path)
+
+    assert manager.data["usageReporting"] == defaultUsageReportingSettings()
+    # the key was present, so the save is treated as having seen the notice
+    assert manager.usageReportingNoticeDue is False
