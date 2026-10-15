@@ -82,6 +82,11 @@ class SaveManager:
                     reporting = defaultUsageReportingSettings()
                     if isinstance(loaded.get("usageReporting"), dict):
                         reporting.update(loaded["usageReporting"])
+                    elif "usageReporting" in loaded:
+                        # a value that is present but not an object (e.g. a
+                        # hand-edited false) reads as off, never as on - the
+                        # same way createUsageReporter treats non-dict settings
+                        reporting["enabled"] = False
                     data["usageReporting"] = reporting
                     self.usageReportingNoticeDue = "usageReporting" not in loaded
             except (json.JSONDecodeError, OSError):

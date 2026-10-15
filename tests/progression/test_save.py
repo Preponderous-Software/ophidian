@@ -1,6 +1,8 @@
 import json
 import os
 
+import pytest
+
 from progression.save import SAVE_VERSION, SaveManager, defaultSaveData, migrateSaveData
 from reporting.usage import defaultUsageReportingSettings
 
@@ -208,15 +210,18 @@ def test_stale_lifetime_stats_keep_their_values_and_gain_missing_keys(tmp_path):
     assert set(stats) == set(defaultSaveData()["lifetimeStats"])
 
 
-def test_non_object_usage_reporting_is_replaced_by_the_defaults(tmp_path):
+@pytest.mark.parametrize("value", [False, None, "off", 0, []])
+def test_non_object_usage_reporting_reads_as_off(tmp_path, value):
     path = os.path.join(tmp_path, "save.json")
     old = defaultSaveData()
-    old["usageReporting"] = False
+    old["usageReporting"] = value
     with open(path, "w") as f:
         json.dump(old, f)
 
     manager = SaveManager(path)
 
-    assert manager.data["usageReporting"] == defaultUsageReportingSettings()
+    expected = defaultUsageReportingSettings()
+    expected["enabled"] = False
+    assert manager.data["usageReporting"] == expected
     # the key was present, so the save is treated as having seen the notice
     assert manager.usageReportingNoticeDue is False
