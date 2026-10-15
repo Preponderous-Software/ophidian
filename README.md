@@ -160,7 +160,8 @@ block to `save.json` (created next to where the game is run):
 ```
 To turn it off, any one of these is enough:
 
-- set `"enabled": false` in that block of `save.json`
+- set `"enabled": false` in that block of `save.json` (a `usageReporting` value that is not
+  an object, such as `"usageReporting": false`, is also read as off)
 - set the environment variable `TRACE_USAGE_REPORTING=off` (also `false`, `0`, `no`), which
   turns off every program that reports to trace
 - set the environment variable `DO_NOT_TRACK=1` (see [consoledonottrack.com](https://consoledonottrack.com))
