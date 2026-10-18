@@ -46,6 +46,7 @@ from progression.ascension import (
     computeGridSizeForLevel,
     shouldAscend,
     applyAscension,
+    computeAscensionBonus,
 )
 from reporting.usage import createUsageReporter, firstRunNotice
 from ui.banner import UiBanner
@@ -135,7 +136,10 @@ class Ophidian:
         # base tick speed captured once so shop/ascension bonuses can derive
         # an effective tick speed each run without compounding across restarts
         self.baseTickSpeed = self.config.tickSpeed
-        self.ascensionBonus = None
+        # rebuilt from the saved level so the bonus survives a relaunch
+        self.ascensionBonus = computeAscensionBonus(
+            self.saveManager.data["ascensionLevel"]
+        )
         self.uiBanner = UiBanner()
         # timers for collected power-ups; must exist before initialize(),
         # which clears them for the starting run

@@ -1,5 +1,8 @@
+import pytest
+
 from progression.ascension import (
     applyAscension,
+    computeAscensionBonus,
     computeGridSizeForLevel,
     shouldAscend,
 )
@@ -82,6 +85,21 @@ def test_apply_ascension_bonus_segments_stay_capped_after_many_ascensions():
         bonus = applyAscension(saveData)
     assert saveData["ascensionLevel"] == 50
     assert bonus["startingBonusSegments"] <= 5
+
+
+def test_compute_ascension_bonus_is_none_before_any_ascension():
+    assert computeAscensionBonus(0) is None
+
+
+def test_compute_ascension_bonus_for_level_three():
+    bonus = computeAscensionBonus(3)
+    assert bonus["tickSpeedMultiplier"] == pytest.approx(0.85)
+    assert bonus["startingBonusSegments"] == 1
+
+
+def test_apply_ascension_returns_the_bonus_for_the_new_level():
+    saveData = {"ascensionLevel": 2}
+    assert applyAscension(saveData) == computeAscensionBonus(3)
 
 
 def test_default_config_reaches_all_curated_biome_levels_before_ascending():
