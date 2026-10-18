@@ -22,15 +22,24 @@ def shouldAscend(level, baseGridSize, minGridSize, maxGridSize):
 
 
 def applyAscension(saveData):
-    """Increments the persistent ascensionLevel in saveData and returns a small,
-    bounded permanent bonus derived from the new ascension level:
+    """Increments the persistent ascensionLevel in saveData and returns the
+    permanent bonus for the new ascension level (see computeAscensionBonus)."""
+    saveData["ascensionLevel"] += 1
+    return computeAscensionBonus(saveData["ascensionLevel"])
+
+
+def computeAscensionBonus(ascensionLevel):
+    """Returns the small, bounded permanent bonus for an ascension level, or
+    None at level 0, where there is no bonus to apply:
       - tickSpeedMultiplier shrinks the base tick speed by 5% per ascension,
         floored at 0.7 (a 30% speed increase cap) so runs never become instant.
       - startingBonusSegments grants one extra starting segment every 3
         ascensions, so growth is gradual rather than trivializing the game.
+    Derived from the level alone, so the bonus can be rebuilt from the saved
+    ascensionLevel when the game is relaunched.
     """
-    saveData["ascensionLevel"] += 1
-    ascensionLevel = saveData["ascensionLevel"]
+    if ascensionLevel <= 0:
+        return None
 
     tickSpeedDecreasePerAscension = 0.05
     minimumTickSpeedMultiplier = 0.7

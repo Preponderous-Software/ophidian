@@ -14,6 +14,7 @@ import pytest
 
 from lib.trace_client import TraceClient
 import ophidian
+from progression import save
 
 
 @pytest.fixture(autouse=True)
@@ -52,3 +53,15 @@ def _neverReportUsageFromTests(monkeypatch, tmp_path):
         return realUrlopen(request, *args, **kwargs)
 
     monkeypatch.setattr(urllib.request, "urlopen", loopbackOnly)
+
+
+@pytest.fixture(autouse=True)
+def _keepSaveFileInTmpPath(monkeypatch, tmp_path):
+    """Points the game's save file into the test's own tmp_path.
+
+    DEFAULT_SAVE_PATH is fixed from the working directory at import time, so
+    chdir alone leaves every Ophidian(...) reading the save.json of whoever
+    runs the suite - and a saved ascension level there would change the
+    tick speed and starting length of every game a test builds.
+    """
+    monkeypatch.setattr(save, "DEFAULT_SAVE_PATH", str(tmp_path / "save.json"))

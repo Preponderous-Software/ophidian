@@ -6,6 +6,8 @@ what initialize() does with them - the tick speed a run starts at, how many
 segments the snake starts with, and whether Second Wind is armed.
 """
 
+import json
+
 import pytest
 
 from textui.textrenderer import TextRenderer
@@ -120,3 +122,13 @@ def test_tick_speed_bonuses_do_not_compound_across_runs(tmp_path, monkeypatch):
 
     assert game.config.tickSpeed == firstRunTickSpeed
     assert firstRunTickSpeed == pytest.approx(game.baseTickSpeed * 0.8 * 1.25)
+
+
+def test_a_saved_ascension_level_restores_its_bonus_on_relaunch(tmp_path, monkeypatch):
+    (tmp_path / "save.json").write_text(json.dumps({"ascensionLevel": 3}))
+
+    game = _makeGame(monkeypatch, tmp_path)
+
+    assert game.config.tickSpeed == pytest.approx(game.baseTickSpeed * 0.85)
+    assert len(game.snakeParts) == 2
+    assert _chainLength(game.selectedSnakePart) == 2
