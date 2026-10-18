@@ -1,0 +1,4 @@
+# Optional: only needed for `python3 src/ophidian.py --record <path.usda>` (see
+# the README). usd-recorder depends on usd-core (OpenUSD), pinned by usd-recorder
+# itself, and needs Python 3.10 or newer.
+usd-recorder @ git+https://github.com/Preponderous-Software/usd-recorder@v0.1.0

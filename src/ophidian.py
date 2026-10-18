@@ -48,6 +48,7 @@ from progression.ascension import (
     applyAscension,
     computeAscensionBonus,
 )
+from recording.usd_recording import REQUIREMENTS_HINT, UsdRecording
 from reporting.usage import createUsageReporter, firstRunNotice
 from ui.banner import UiBanner
 from ui.shop_screen import PygameShopScreen
@@ -101,7 +102,7 @@ RUNNING_IN_BROWSER = sys.platform == "emscripten"
 # @author Daniel McCoy Stephenson
 # @since August 6th, 2022
 class Ophidian:
-    def __init__(self, useTextUI=False):
+    def __init__(self, useTextUI=False, recordPath=None):
         self.config = Config()
         self.config.useTextUI = useTextUI
 
@@ -157,6 +158,9 @@ class Ophidian:
         self.score = 0
         self.changedDirectionThisTick = False
         self.collision = False
+        # --record <path>: every tick of the session is recorded to this
+        # .usda file (recording/usd_recording.py); None records nothing
+        self.recording = UsdRecording(recordPath) if recordPath is not None else None
 
     def initializeGameDisplay(self):
         if self.config.useTextUI:
@@ -585,6 +589,7 @@ class Ophidian:
             self.recordCurrentRun("quit")
             self.renderObituaryScreen()
         self.displayStatsInConsole()
+        self.finishRecording()
         # gives a report still in flight a moment to finish; nothing waits
         # on one that has not started
         self.usageReporter.close()
@@ -593,6 +598,14 @@ class Ophidian:
         else:
             self.pygame.quit()
         quit()
+
+    def finishRecording(self):
+        """Writes the --record stage, once, on the way out."""
+        if self.recording is None:
+            return
+        path = self.recording.close()
+        print(f"Recorded {self.recording.getTicksRecorded()} ticks to {path}")
+        self.recording = None
 
     def getLocation(self, entity: Entity):
         locationID = entity.getLocationID()
@@ -1279,6 +1292,8 @@ class Ophidian:
         loop can await the wait instead of blocking on it."""
         if self.paused:
             return
+        if self.recording is not None:
+            self.recording.recordTick(self)
         self.tick += 1
         self.changedDirectionThisTick = False
 
@@ -1450,14 +1465,29 @@ class Ophidian:
 
 import argparse
 
-if __name__ == "__main__":
+
+def parseArguments(argv=None):
     parser = argparse.ArgumentParser(description="Ophidian - A snake game")
     parser.add_argument(
         "--text-ui",
         action="store_true",
         help="Use text-based UI instead of graphical UI",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--record",
+        metavar="PATH",
+        help="Record the session as a time-sampled OpenUSD stage (.usda); needs "
+        "the optional usd-recorder package (" + REQUIREMENTS_HINT + ")",
+    )
+    return parser.parse_args(argv)
 
-    ophidian = Ophidian(useTextUI=args.text_ui)
+
+if __name__ == "__main__":
+    args = parseArguments()
+    if args.record is not None and not UsdRecording.isAvailable():
+        sys.exit(
+            "--record needs the optional usd-recorder package: " + REQUIREMENTS_HINT
+        )
+
+    ophidian = Ophidian(useTextUI=args.text_ui, recordPath=args.record)
     ophidian.run()

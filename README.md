@@ -64,6 +64,32 @@ The text-based UI is perfect for:
 - Low-resource systems
 - Terminal enthusiasts
 
+## Recording a replay
+`--record <path.usda>` records the session as a time-sampled [OpenUSD](https://openusd.org) stage,
+one time code per tick (10 per second), that can be scrubbed in usdview, Blender or any USD tool.
+It works with either UI and needs the optional
+[usd-recorder](https://github.com/Preponderous-Software/usd-recorder) package (Python 3.10 or newer;
+it brings in `usd-core`), which the game does not otherwise need:
+
+```bash
+pip install -r requirements-record.txt
+python3 src/ophidian.py --record run.usda
+```
+
+The file is written when you quit. Every tick the game advances is recorded, across collisions and
+level changes, so the stage's time codes count the whole session while its `tick` extra is the
+run's own counter (it restarts at 0 with each run), alongside `level`, `length` and `score`. Every
+entity on the board is recorded at its grid coordinates `(x, y, 0)` in the colour the game draws it
+with, with its `kind`: `head`, `body`, `food` or `powerUp`. Paused frames are not ticks and are not
+recorded. Without `--record` nothing is recorded or imported, and the browser build is unaffected.
+
+![A recorded session replayed in Blender](assets/replay.gif)
+
+The replay above is the first 900 ticks of a 1,500-tick session (several runs and a level change,
+a 1 MB stage), played headlessly through the same per-tick steps as the text UI by a small
+scripted autopilot standing in for the keyboard, then rendered top-down with headless Blender's USD
+importer and Cycles in the recorded colours.
+
 ## Pickups
 Most of what spawns on the board is food, which grows the ophidian by one segment.
 The rest are power-ups, which grant a temporary effect instead of growing you:
