@@ -1,15 +1,48 @@
-"""--record (recording/usd_recording.py) against real stages; skipped when the
-optional usd-recorder package (requirements-record.txt) is not installed."""
+"""--record (recording/usd_recording.py). What UsdRecording hands the recorder
+is checked against a stand-in usd_recorder module, so it runs everywhere; the
+tests against real stages are skipped when the optional usd-recorder package
+(requirements-record.txt) is not installed."""
 
 import builtins
 import sys
+import types
 
 import pytest
 
 import ophidian
+from food.food import Food
+from lib.pyenvlib.entity import Entity
 from ophidian import Ophidian, parseArguments
-from recording.usd_recording import UsdRecording
+from powerup.powerup import PowerUp, PowerUpType
+from recording.usd_recording import UsdRecording, kindOf
+from snake.snakePart import SnakePart
 from textui.textrenderer import TextRenderer
+
+
+class _FakeRecorder:
+    """Stands in for usd_recorder.Recorder, keeping what it is handed, so
+    UsdRecording's own bookkeeping is checked where usd-recorder (Python 3.10
+    or newer) is not installed."""
+
+    def __init__(self, path, time_codes_per_second):
+        self.path = path
+        self.timeCodesPerSecond = time_codes_per_second
+        self.frames = []
+        self.closed = False
+
+    def record(self, frame, entities, extras):
+        self.frames.append((frame, entities, extras))
+
+    def close(self):
+        self.closed = True
+
+
+@pytest.fixture
+def fakeUsdRecorder(monkeypatch):
+    module = types.ModuleType("usd_recorder")
+    module.Recorder = _FakeRecorder
+    monkeypatch.setitem(sys.modules, "usd_recorder", module)
+    return module
 
 
 def _makeGame(monkeypatch, tmp_path, recordPath=None):
@@ -52,6 +85,115 @@ def test_without_usd_recorder_recording_explains_what_to_install(tmp_path, monke
     assert not UsdRecording.isAvailable()
     with pytest.raises(RuntimeError, match="requirements-record.txt"):
         UsdRecording(str(tmp_path / "run.usda"))
+
+
+def test_with_usd_recorder_importable_recording_is_available(fakeUsdRecorder):
+    assert UsdRecording.isAvailable()
+
+
+def test_the_recorder_writes_to_the_path_at_ten_time_codes_per_second(
+    fakeUsdRecorder, tmp_path
+):
+    path = str(tmp_path / "run.usda")
+
+    recording = UsdRecording(path)
+
+    assert recording.recorder.path == path
+    assert recording.recorder.timeCodesPerSecond == 10
+    assert recording.getTicksRecorded() == 0
+
+
+def test_kind_of_names_each_entity_on_the_board():
+    game = types.SimpleNamespace(selectedSnakePart=SnakePart((0, 255, 0)))
+
+    assert kindOf(game.selectedSnakePart, game) == "head"
+    assert kindOf(SnakePart((0, 200, 0)), game) == "body"
+    assert kindOf(Food((255, 0, 0)), game) == "food"
+    assert kindOf(PowerUp(PowerUpType.SPEED), game) == "powerUp"
+    assert kindOf(Entity("rock"), game) == "Entity"
+
+
+def test_ids_are_numbered_in_the_order_entities_first_appear(fakeUsdRecorder):
+    recording = UsdRecording("run.usda")
+    first, second = Food((255, 0, 0)), Food((255, 0, 0))
+
+    assert recording.recordedId(first) == 0
+    assert recording.recordedId(second) == 1
+    assert recording.recordedId(first) == 0
+
+
+def test_record_tick_hands_every_entity_and_the_run_to_the_recorder(
+    fakeUsdRecorder, tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path, recordPath=str(tmp_path / "run.usda"))
+    game.score = 12.0
+    recording = game.recording
+
+    recording.recordTick(game)
+
+    (frame, entities, extras) = recording.recorder.frames[0]
+    assert frame == 0
+    assert extras == {
+        "level": game.level,
+        "tick": game.tick,
+        "length": len(game.snakeParts),
+        "score": 12,
+    }
+    assert isinstance(extras["score"], int)
+    onBoard = [
+        (location, entity)
+        for location in game.environment.getGrid().getLocations().values()
+        for entity in location.getEntities().values()
+    ]
+    assert len(entities) == len(onBoard)
+    for location, entity in onBoard:
+        recorded = entities[recording.recordedId(entity)]
+        assert recorded["position"] == (location.getX(), location.getY(), 0)
+        assert recorded["color"] == tuple(c / 255 for c in entity.getColor())
+        assert recorded["kind"] == kindOf(entity, game)
+
+
+def test_an_entity_keeps_its_id_from_tick_to_tick(
+    fakeUsdRecorder, tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path, recordPath=str(tmp_path / "run.usda"))
+    head = game.selectedSnakePart
+
+    _advance(game, 2)
+
+    frames = game.recording.recorder.frames
+    assert [frame for frame, _, _ in frames] == [0, 1]
+    headId = game.recording.recordedId(head)
+    assert frames[0][1][headId]["kind"] == "head"
+    assert frames[1][1][headId]["kind"] == "head"
+    assert [extras["tick"] for _, _, extras in frames] == [0, 1]
+
+
+def test_a_paused_tick_reaches_no_recorder(fakeUsdRecorder, tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path, recordPath=str(tmp_path / "run.usda"))
+    _advance(game, 1)
+    game.paused = True
+
+    game.advanceTick()
+
+    assert len(game.recording.recorder.frames) == 1
+    assert game.recording.getTicksRecorded() == 1
+
+
+def test_finish_recording_closes_once_and_reports_the_ticks(
+    fakeUsdRecorder, tmp_path, monkeypatch, capsys
+):
+    path = str(tmp_path / "run.usda")
+    game = _makeGame(monkeypatch, tmp_path, recordPath=path)
+    _advance(game, 3)
+    recorder = game.recording.recorder
+
+    game.finishRecording()
+    game.finishRecording()
+
+    assert recorder.closed
+    assert game.recording is None
+    assert capsys.readouterr().out.count(f"Recorded 3 ticks to {path}") == 1
 
 
 def test_each_tick_records_the_board(tmp_path, monkeypatch):
