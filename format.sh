@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: ./format.sh
 
-# src/lib holds vendored copies of graphik and py_env_lib and is left alone by
+# src/lib holds vendored copies of graphik, py_env_lib and trace_client and is left alone by
 # both tools (see issue #120). black reads its exclusion from pyproject.toml;
 # autoflake has no config file support, so it is told here.
 black src
