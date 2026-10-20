@@ -53,9 +53,9 @@ python3 src/ophidian.py --text-ui
 `./run.sh` starts the graphical UI too, after pulling the latest code and running
 the tests. It sends the game's console output to `output.txt` rather than the
 terminal, so the first-run usage reporting notice and the console copy of each
-obituary and its chronicle end up in that file. It and `./test.sh` pick the interpreter themselves — `python3` first,
-then `python`, taking whichever reports 3.8 or newer — so set `PYTHON` to
-override that choice:
+obituary and its chronicle end up in that file. `./run.sh` and `./test.sh` pick
+the interpreter themselves — `python3` first, then `python`, taking whichever
+reports 3.8 or newer — so set `PYTHON` to override that choice:
 ```bash
 PYTHON=.venv/bin/python ./test.sh
 ```
