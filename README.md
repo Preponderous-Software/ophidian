@@ -51,9 +51,11 @@ python3 src/ophidian.py --text-ui
 ```
 
 `./run.sh` starts the graphical UI too, after pulling the latest code and running
-the tests. It and `./test.sh` pick the interpreter themselves — `python3` first,
-then `python`, taking whichever reports 3.8 or newer — so set `PYTHON` to
-override that choice:
+the tests. It sends the game's console output to `output.txt` rather than the
+terminal, so the first-run usage reporting notice and the console copy of each
+obituary and its chronicle end up in that file. `./run.sh` and `./test.sh` pick
+the interpreter themselves — `python3` first, then `python`, taking whichever
+reports 3.8 or newer — so set `PYTHON` to override that choice:
 ```bash
 PYTHON=.venv/bin/python ./test.sh
 ```
@@ -175,7 +177,8 @@ environment variable `TRACE_INSTALL_ID` sends that value instead and leaves the 
 The file is only created while reporting is on, so every opt-out below also stops it, and the
 browser build (which never reports) has none.
 
-The first time the game starts it says so once on the console and writes a `usageReporting`
+The first time the game starts it says so once on the console (in `output.txt` when it was
+started by `./run.sh`) and writes a `usageReporting`
 block to `save.json` (created next to where the game is run):
 ```json
 "usageReporting": {
