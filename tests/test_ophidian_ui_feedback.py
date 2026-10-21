@@ -101,6 +101,47 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
     ]
 
 
+def test_display_stats_in_console_prints_length_grid_share_and_score(
+    tmp_path, monkeypatch, capsys
+):
+    # the summary quitApplication() leaves in the console on the way out
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    game.snakeParts = [game.selectedSnakePart] * 5
+    game.score = 137
+    capsys.readouterr()
+
+    game.displayStatsInConsole()
+
+    assert capsys.readouterr().out.splitlines() == [
+        "The ophidian had a length of 5 and took up "
+        + str(int(5 / numLocations * 100))
+        + " percent of the world.",
+        "Score: 137",
+        "-----",
+    ]
+
+
+def test_display_stats_in_console_rounds_the_grid_share_down(
+    tmp_path, monkeypatch, capsys
+):
+    game = _makeGame(monkeypatch, tmp_path)
+    numLocations = len(game.environment.grid.getLocations())
+    # one part short of the whole grid is still under 100 percent
+    game.snakeParts = [game.selectedSnakePart] * (numLocations - 1)
+    capsys.readouterr()
+
+    game.displayStatsInConsole()
+
+    firstLine = capsys.readouterr().out.splitlines()[0]
+    assert firstLine.endswith(
+        "took up "
+        + str((numLocations - 1) * 100 // numLocations)
+        + " percent of the world."
+    )
+    assert "100 percent" not in firstLine
+
+
 def test_text_ui_l_key_toggles_tick_speed_limit(tmp_path, monkeypatch):
     # regression test: the pygame branch of handleKeyDownEvent has always
     # let the player toggle config.limitTickSpeed with 'l', but the text UI

@@ -196,6 +196,86 @@ def test_pygame_loop_replays_held_frames_without_blocking(pygameGame, monkeypatc
     assert game.deferFrameHolds is False
 
 
+def _drawOneFrameAtLength(game, monkeypatch, length):
+    """Runs a single frame of the pygame loop with the ophidian forced to
+    the given length, and returns the colors the progress bar was drawn
+    with at its left end and its right end."""
+    monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
+    monkeypatch.setattr(
+        Ophidian,
+        "moveEntity",
+        lambda self, entity, direction: setattr(self, "running", False),
+    )
+    game.config.limitTickSpeed = False
+    # only the count is read when the bar is drawn
+    game.snakeParts = [game.selectedSnakePart] * length
+
+    asyncio.run(game.runPygameUI())
+
+    width, height = game.gameDisplay.get_size()
+    barY = height - 10
+    return (
+        tuple(game.gameDisplay.get_at((5, barY)))[:3],
+        tuple(game.gameDisplay.get_at((width - 5, barY)))[:3],
+    )
+
+
+def test_pygame_progress_bar_is_red_below_half_the_level_threshold(
+    pygameGame, monkeypatch
+):
+    game = pygameGame
+    numLocations = len(game.environment.grid.getLocations())
+    # the largest length still under half of the 50% needed to level up
+    length = int(numLocations * game.config.levelProgressPercentageRequired / 2)
+    assert length / numLocations < game.config.levelProgressPercentageRequired / 2
+
+    filled, unfilled = _drawOneFrameAtLength(game, monkeypatch, length)
+
+    assert filled == game.config.red
+    assert unfilled == game.config.black
+
+
+def test_pygame_progress_bar_is_yellow_from_half_the_level_threshold(
+    pygameGame, monkeypatch
+):
+    game = pygameGame
+    numLocations = len(game.environment.grid.getLocations())
+    # the smallest length at or above half the threshold
+    length = int(numLocations * game.config.levelProgressPercentageRequired / 2) + 1
+    assert length / numLocations < game.config.levelProgressPercentageRequired
+
+    filled, unfilled = _drawOneFrameAtLength(game, monkeypatch, length)
+
+    assert filled == game.config.yellow
+    assert unfilled == game.config.black
+
+
+def test_pygame_progress_bar_is_green_once_the_level_threshold_is_met(
+    pygameGame, monkeypatch
+):
+    game = pygameGame
+    numLocations = len(game.environment.grid.getLocations())
+    # the smallest length at or above the threshold itself
+    length = int(numLocations * game.config.levelProgressPercentageRequired) + 1
+
+    filled, unfilled = _drawOneFrameAtLength(game, monkeypatch, length)
+
+    assert filled == game.config.green
+    assert unfilled == game.config.black
+
+
+def test_pygame_progress_bar_fills_the_whole_width_on_a_full_grid(
+    pygameGame, monkeypatch
+):
+    game = pygameGame
+    numLocations = len(game.environment.grid.getLocations())
+
+    filled, unfilled = _drawOneFrameAtLength(game, monkeypatch, numLocations)
+
+    assert filled == game.config.green
+    assert unfilled == game.config.green
+
+
 def test_hold_frame_sleeps_outside_the_async_loop(pygameGame, monkeypatch):
     # the text UI, tests and the way out of the desktop game still block
     game = pygameGame
