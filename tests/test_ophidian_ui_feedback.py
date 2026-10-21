@@ -101,6 +101,41 @@ def test_notify_queues_messages_instead_of_clobbering(tmp_path, monkeypatch):
     ]
 
 
+def test_display_stats_in_console_prints_length_grid_share_and_score(
+    tmp_path, monkeypatch, capsys
+):
+    # the summary quitApplication() leaves in the console on the way out
+    game = _makeGame(monkeypatch, tmp_path)
+    # a fresh save starts on level 1's 5x5 grid
+    assert len(game.environment.grid.getLocations()) == 25
+    game.snakeParts = [game.selectedSnakePart] * 5
+    game.score = 137
+    capsys.readouterr()
+
+    game.displayStatsInConsole()
+
+    assert capsys.readouterr().out.splitlines() == [
+        "The ophidian had a length of 5 and took up 20 percent of the world.",
+        "Score: 137",
+        "-----",
+    ]
+
+
+def test_display_stats_in_console_rounds_the_grid_share_down(
+    tmp_path, monkeypatch, capsys
+):
+    game = _makeGame(monkeypatch, tmp_path)
+    assert len(game.environment.grid.getLocations()) == 25
+    # 24 of 25 is 96 percent, never rounded up to a full grid
+    game.snakeParts = [game.selectedSnakePart] * 24
+    capsys.readouterr()
+
+    game.displayStatsInConsole()
+
+    firstLine = capsys.readouterr().out.splitlines()[0]
+    assert firstLine.endswith("took up 96 percent of the world.")
+
+
 def test_text_ui_l_key_toggles_tick_speed_limit(tmp_path, monkeypatch):
     # regression test: the pygame branch of handleKeyDownEvent has always
     # let the player toggle config.limitTickSpeed with 'l', but the text UI
