@@ -106,7 +106,8 @@ def test_display_stats_in_console_prints_length_grid_share_and_score(
 ):
     # the summary quitApplication() leaves in the console on the way out
     game = _makeGame(monkeypatch, tmp_path)
-    numLocations = len(game.environment.grid.getLocations())
+    # a fresh save starts on level 1's 5x5 grid
+    assert len(game.environment.grid.getLocations()) == 25
     game.snakeParts = [game.selectedSnakePart] * 5
     game.score = 137
     capsys.readouterr()
@@ -114,9 +115,7 @@ def test_display_stats_in_console_prints_length_grid_share_and_score(
     game.displayStatsInConsole()
 
     assert capsys.readouterr().out.splitlines() == [
-        "The ophidian had a length of 5 and took up "
-        + str(int(5 / numLocations * 100))
-        + " percent of the world.",
+        "The ophidian had a length of 5 and took up 20 percent of the world.",
         "Score: 137",
         "-----",
     ]
@@ -126,20 +125,15 @@ def test_display_stats_in_console_rounds_the_grid_share_down(
     tmp_path, monkeypatch, capsys
 ):
     game = _makeGame(monkeypatch, tmp_path)
-    numLocations = len(game.environment.grid.getLocations())
-    # one part short of the whole grid is still under 100 percent
-    game.snakeParts = [game.selectedSnakePart] * (numLocations - 1)
+    assert len(game.environment.grid.getLocations()) == 25
+    # 24 of 25 is 96 percent, never rounded up to a full grid
+    game.snakeParts = [game.selectedSnakePart] * 24
     capsys.readouterr()
 
     game.displayStatsInConsole()
 
     firstLine = capsys.readouterr().out.splitlines()[0]
-    assert firstLine.endswith(
-        "took up "
-        + str((numLocations - 1) * 100 // numLocations)
-        + " percent of the world."
-    )
-    assert "100 percent" not in firstLine
+    assert firstLine.endswith("took up 96 percent of the world.")
 
 
 def test_text_ui_l_key_toggles_tick_speed_limit(tmp_path, monkeypatch):
