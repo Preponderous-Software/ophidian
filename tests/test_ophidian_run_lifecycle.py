@@ -1,3 +1,4 @@
+import json
 import time
 
 from progression.obituary import formatObituaryScreen
@@ -219,3 +220,48 @@ def test_ending_a_run_shows_that_run_s_score_on_the_obituary_screen(
     joined = "\n".join(lines)
     assert "score of 4242" in joined
     assert "Highest score ever: 9999" in joined
+
+
+def _primeForObsidianUnlock(game):
+    # Obsidian unlocks at five lifetime runs; a fresh save's other stats sit
+    # far below every other skin's threshold, so recording one more run
+    # unlocks Obsidian and nothing else
+    game.saveManager.data["lifetimeStats"]["totalRuns"] = 4
+
+
+def test_ending_a_run_that_earns_a_skin_announces_it(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    _primeForObsidianUnlock(game)
+    game.uiBanner.queue.clear()
+
+    game.recordCurrentRun("collision")
+
+    assert "obsidian" in game.saveManager.data["unlockedCosmetics"]
+    assert "New skin unlocked: Obsidian!" in game.uiBanner.queue
+
+
+def test_ending_a_run_that_earns_a_skin_saves_the_unlock(tmp_path, monkeypatch):
+    # recordRun() saves before the unlock check runs, so only the save that
+    # follows a new unlock gets it onto disk
+    game = _makeGame(monkeypatch, tmp_path)
+    _primeForObsidianUnlock(game)
+
+    game.recordCurrentRun("collision")
+
+    with open(tmp_path / "save.json") as f:
+        saved = json.load(f)
+    assert "obsidian" in saved["unlockedCosmetics"]
+
+
+def test_a_skin_already_unlocked_is_not_announced_again(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    _primeForObsidianUnlock(game)
+    game.recordCurrentRun("collision")
+    assert "New skin unlocked: Obsidian!" in game.uiBanner.queue
+    game.uiBanner.queue.clear()
+
+    game.recordCurrentRun("collision")
+
+    assert not any(
+        message.startswith("New skin unlocked") for message in game.uiBanner.queue
+    )
