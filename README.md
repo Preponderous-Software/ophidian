@@ -15,8 +15,10 @@ spot on the board to turn towards it. The browser build is the graphical UI
 built with [pygbag](https://github.com/pygame-web/pygbag) from `src/`, whose
 `main.py` is its entry point (`python -m pygbag --build src` builds it into
 `src/build/web`); `.github/workflows/browser.yml` builds it on every pull request
-and deploys it. Two things differ there: progress (`save.json`) lasts only as
-long as the tab, and no usage reporting is sent at all. There is no quit key, as
+and every push to `main`, and deploys it from a push to `main` when the
+`ARCADE_ENABLED` variable is `true`, or from a manual run. Two things differ
+there: progress (`save.json`) lasts only as long as the tab, and no usage
+reporting is sent at all. There is no quit key, as
 closing the tab ends the game.
 
 ## Requirements
@@ -68,7 +70,11 @@ The text-based UI is perfect for:
 
 ## Recording a replay
 `--record <path.usda>` records the session as a time-sampled [OpenUSD](https://openusd.org) stage,
-one time code per tick (10 per second), that can be scrubbed in usdview, Blender or any USD tool.
+one time code per tick, that can be scrubbed in usdview, Blender or any USD tool. The stage plays
+back at a fixed 10 time codes per second, which is not the rate the game ran at: a tick lasts 0.15s
+by default, longer on a first level with the Slow Starter upgrade, and shorter under a Speed Boost,
+with ascension, or with the speed limit turned off (`l`). A replay therefore keeps the session's
+ticks but not its pace: at the default tick it plays about one and a half times as fast.
 It works with either UI and needs the optional
 [usd-recorder](https://github.com/Preponderous-Software/usd-recorder) package (Python 3.10 or newer;
 it brings in `usd-core`), which the game does not otherwise need:
