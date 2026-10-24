@@ -15,9 +15,10 @@ spot on the board to turn towards it. The browser build is the graphical UI
 built with [pygbag](https://github.com/pygame-web/pygbag) from `src/`, whose
 `main.py` is its entry point (`python -m pygbag --build src` builds it into
 `src/build/web`); `.github/workflows/browser.yml` builds it on every pull request
-and every push to `main`, and deploys it from a push to `main` when the `ARCADE_ENABLED`
-repository variable is `true`, or from a manual run. Two things differ there: progress (`save.json`) lasts only as
-long as the tab, and no usage reporting is sent at all. There is no quit key, as
+and every push to `main`, and deploys it from a push to `main` when the
+`ARCADE_ENABLED` variable is `true`, or from a manual run. Two things differ
+there: progress (`save.json`) lasts only as long as the tab, and no usage
+reporting is sent at all. There is no quit key, as
 closing the tab ends the game.
 
 ## Requirements
