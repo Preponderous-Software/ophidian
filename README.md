@@ -128,6 +128,53 @@ Note that the score resets at the start of each level, alongside the board.
 When a run ends, the score it finished on is reported in the obituary that both UIs
 show, alongside the all-time best in the chronicle printed beneath it.
 
+## Progression
+Currency, upgrades, unlocked skins, the ascension count and lifetime totals are kept in
+`save.json`, next to where the game is run. The level is not, so every launch starts on
+level 1.
+
+### Levels
+A run that ends (in a collision or with `r`) with the ophidian filling more than half the
+grid sends the next run one level higher. Each level adds two to the width and height of
+the board, from 5×5 on level 1 to a cap of 15×15 on level 6, and gives the board its own
+place name.
+
+### Currency and the upgrade shop
+Every run that ends — in a collision, with `r` or with `q` — banks one currency for each
+segment the ophidian finished with beyond its head. Currency is spent in the shop (`p`) on
+permanent upgrades:
+
+Upgrade | Cost | Effect
+------------ | ------------- | -------------
+Head Start | 10 | each run starts with 2 extra segments
+Slow Starter | 15 | ticks are 25% slower on level 1
+Second Wind | 25 | the first collision of each run is survived; only a second one ends it
+
+The graphical shop is browsed with w/s or ↑/↓, bought from with enter or space, and closed
+with esc or `p`; the text UI lists the upgrades by number and asks for one (0 leaves).
+Owned upgrades are listed on the HUD, Second Wind with whether it is armed or used this run.
+
+Segments a run starts with, from Head Start or ascension, count towards that run's length
+like any other, so they earn currency too.
+
+### Cosmetic skins
+Skins change the ophidian's colour and nothing else. `c` cycles through the ones unlocked so
+far; each unlocks once, from lifetime totals, when a run ends:
+
+Skin | Unlocked by
+------------ | -------------
+Default | always (a random colour each run)
+Ember | reaching level 3
+Frost | 300 ticks survived in total
+Gold | 20 food eaten in total
+Obsidian | 5 runs played
+
+### Ascension
+Leveling up from level 6, where the board is already at its cap, ascends instead: the next
+run starts back on level 1 and the ascension count rises by one. Each ascension makes ticks
+5% shorter, down to at most 30% shorter, and every third ascension adds a starting segment,
+up to 5 extra.
+
 ## Controls
 Key | Action
 ------------ | -------------
