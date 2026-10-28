@@ -129,13 +129,15 @@ When a run ends, the score it finished on is reported in the obituary that both 
 show, alongside the all-time best in the chronicle printed beneath it.
 
 ## Progression
-Progress that outlasts a run is kept in `save.json`, next to where the game is run.
+Currency, upgrades, unlocked skins, the ascension count and lifetime totals are kept in
+`save.json`, next to where the game is run. The level is not, so every launch starts on
+level 1.
 
 ### Levels
 A run that ends (in a collision or with `r`) with the ophidian filling more than half the
 grid sends the next run one level higher. Each level adds two to the width and height of
 the board, from 5×5 on level 1 to a cap of 15×15 on level 6, and gives the board its own
-place name. Quitting with `q` never changes the level.
+place name.
 
 ### Currency and the upgrade shop
 Every run that ends — in a collision, with `r` or with `q` — banks one currency for each
