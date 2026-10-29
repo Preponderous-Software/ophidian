@@ -143,3 +143,13 @@ def test_get_next_cosmetic_id_wraps_around_unlocked_only():
 
     # a locked/unknown current id falls back to the first unlocked skin
     assert getNextCosmeticId(saveData, "frost") == "default"
+
+
+def test_get_next_cosmetic_id_falls_back_to_default_when_nothing_is_unlocked():
+    # a hand-edited save can empty the list; cycling must still land on a
+    # real skin rather than raising on the empty list
+    saveData = defaultSaveData()
+    saveData["unlockedCosmetics"] = []
+
+    assert getNextCosmeticId(saveData, "ember") == "default"
+    assert getNextCosmeticId(saveData, "default") == "default"

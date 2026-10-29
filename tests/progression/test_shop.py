@@ -5,6 +5,7 @@ from progression.shop import (
     UPGRADES,
     currencyEarnedForRun,
     getActiveUpgradeLabels,
+    getUpgrade,
     listUpgrades,
     purchaseUpgrade,
 )
@@ -110,3 +111,12 @@ def test_get_active_upgrade_labels_shows_second_wind_armed_state():
 
     assert armed == ["Second Wind (armed)"]
     assert used == ["Second Wind (used)"]
+
+
+def test_get_upgrade_returns_the_registry_entry_for_a_known_id():
+    for upgradeId in ("head_start", "slow_starter", "second_wind"):
+        assert getUpgrade(upgradeId) is UPGRADES[upgradeId]
+
+
+def test_get_upgrade_returns_none_for_an_unknown_id():
+    assert getUpgrade("does_not_exist") is None
