@@ -240,6 +240,49 @@ def test_disabled_reason_says_why_the_reporter_sends_nothing():
     )
 
 
+def test_a_key_that_is_not_a_string_is_read_as_no_key():
+    # a hand-edited save.json can hold any JSON value there; a number must
+    # not be sent as the bearer token
+    for key in (123, ["k"], {"k": "v"}, True):
+        reporter = createUsageReporter(
+            {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": key}
+        )
+        assert reporter.enabled is False, key
+        assert reporter.disabled_reason == "no key", key
+    assert not os.path.exists(installIdFile())
+
+
+def test_an_endpoint_that_is_not_a_string_turns_reporting_off():
+    # rather than guessing where a malformed endpoint meant to point, the
+    # reporter falls back to the default address and sends nothing to it
+    for endpoint in (42, ["https://example.invalid"], {"url": "x"}, True):
+        reporter = createUsageReporter(
+            {"enabled": True, "endpoint": endpoint, "key": "k"}
+        )
+        assert reporter.enabled is False, endpoint
+        assert reporter.disabled_reason == "config", endpoint
+    assert not os.path.exists(installIdFile())
+
+
+def test_settings_the_client_rejects_yield_the_no_op_client_instead_of_raising(
+    monkeypatch,
+):
+    # TraceClient raises ValueError on an over-long version or installation
+    # ID; startup falls back to the disabled client rather than crashing
+    settings = {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": "k"}
+
+    reporter = createUsageReporter(settings, version="9" * 256)
+    assert reporter.enabled is False
+    assert reporter.disabled_reason == "config"
+
+    monkeypatch.setenv("TRACE_INSTALL_ID", "i" * 256)
+    reporter = createUsageReporter(settings)
+    assert reporter.enabled is False
+    assert reporter.disabled_reason == "config"
+    reporter.report("startup")  # must be a harmless no-op
+    assert not os.path.exists(installIdFile())
+
+
 def test_environment_opt_out_wins_over_an_enabled_save(monkeypatch):
     for variable, value in (("DO_NOT_TRACK", "1"), ("TRACE_USAGE_REPORTING", "off")):
         monkeypatch.delenv("DO_NOT_TRACK", raising=False)
