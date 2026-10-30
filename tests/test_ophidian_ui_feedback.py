@@ -198,3 +198,22 @@ def test_spawn_snake_part_prefers_an_empty_neighbor_over_occupied_ones(
 
     newSegment = game.snakeParts[-1]
     assert game.getLocation(newSegment) is grid.getLeft(tailLocation)
+
+
+def test_the_graphical_drawing_steps_are_noops_in_text_ui_mode(tmp_path, monkeypatch):
+    # text mode never opens a window, so there is no gameDisplay or graphik
+    # for these to reach for; the text renderer draws the board, banner and
+    # HUD itself
+    game = _makeGame(monkeypatch, tmp_path)
+    game.notify("A message only the text renderer should show")
+    assert not hasattr(game, "gameDisplay")
+    assert not hasattr(game, "graphik")
+
+    # each would raise AttributeError if it got past its text-UI guard
+    game.drawEnvironment()
+    game.drawUiMessage()
+    game.drawHud()
+
+    # the banner is left queued, its timer unstarted, for the text renderer
+    assert game.uiBanner.queue[-1] == "A message only the text renderer should show"
+    assert game.uiBanner.expiresAt is None

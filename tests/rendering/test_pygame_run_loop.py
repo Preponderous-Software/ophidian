@@ -1,6 +1,7 @@
 import asyncio
 
 import pygame
+import pytest
 
 from ophidian import Ophidian
 
@@ -194,6 +195,61 @@ def test_pygame_loop_replays_held_frames_without_blocking(pygameGame, monkeypatc
     assert awaited[:2] == [3.0, 1.5]
     assert game.heldFrames == []
     assert game.deferFrameHolds is False
+
+
+def test_pygame_loop_quits_when_the_window_is_closed(pygameGame, monkeypatch):
+    game = pygameGame
+    quits = []
+
+    # the real quitApplication ends the process with quit(), so nothing
+    # after it in the frame - the move included - is reached
+    def recordQuitAndExit(self):
+        quits.append("quit")
+        raise SystemExit
+
+    monkeypatch.setattr(Ophidian, "quitApplication", recordQuitAndExit)
+    moves = []
+
+    # stops the loop if the close is ever ignored, so that fails rather
+    # than spinning forever
+    def recordMoveAndStop(self, entity, direction):
+        moves.append(direction)
+        self.running = False
+
+    monkeypatch.setattr(Ophidian, "moveEntity", recordMoveAndStop)
+    eventFrames = [[pygame.event.Event(pygame.QUIT)]]
+    monkeypatch.setattr(
+        pygame.event, "get", lambda: eventFrames.pop(0) if eventFrames else []
+    )
+
+    with pytest.raises(SystemExit):
+        asyncio.run(game.runPygameUI())
+
+    assert quits == ["quit"]
+    assert moves == []
+
+
+def test_pygame_loop_resizes_the_cells_to_fit_a_resized_window(pygameGame, monkeypatch):
+    game = pygameGame
+    monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
+    monkeypatch.setattr(
+        Ophidian,
+        "moveEntity",
+        lambda self, entity, direction: setattr(self, "running", False),
+    )
+    eventFrames = [[pygame.event.Event(pygame.WINDOWRESIZED)]]
+    monkeypatch.setattr(
+        pygame.event, "get", lambda: eventFrames.pop(0) if eventFrames else []
+    )
+    # stands in for the window the player has just dragged to a new size
+    game.gameDisplay = pygame.Surface((400, 200))
+    grid = game.environment.getGrid()
+    assert game.locationWidth != 400 / grid.getRows()
+
+    asyncio.run(game.runPygameUI())
+
+    assert game.locationWidth == 400 / grid.getRows()
+    assert game.locationHeight == 200 / grid.getColumns()
 
 
 def _drawOneFrameAtLength(game, monkeypatch, length):
