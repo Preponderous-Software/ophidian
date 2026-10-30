@@ -59,6 +59,21 @@ def test_a_tap_steers_towards_where_it_landed_from_the_head(pygameGame):
     assert game.selectedSnakePart.getDirection() == DIRECTION_UP
 
 
+def test_a_tap_is_ignored_while_the_head_is_off_the_board(pygameGame):
+    # there is no head to measure the tap from, so it steers nowhere rather
+    # than crashing on the -1 sentinel getLocation returns
+    game = pygameGame
+    _travelling(game, DIRECTION_RIGHT)
+    head = game.selectedSnakePart
+    game.getLocation(head).removeEntity(head)
+    head.setLocationID(-1)
+
+    game.handlePointerGesture((0, 0), (0, 0))
+
+    assert head.getDirection() == DIRECTION_RIGHT
+    assert game.changedDirectionThisTick is False
+
+
 def test_a_gesture_cannot_reverse_the_snake_into_its_neck(pygameGame):
     game = pygameGame
     _travelling(game, DIRECTION_RIGHT)
