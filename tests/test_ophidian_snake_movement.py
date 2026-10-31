@@ -147,6 +147,44 @@ def test_a_move_into_the_border_is_dropped(tmp_path, monkeypatch):
     assert game.collision is False
 
 
+def test_a_move_is_not_logged_outside_debug_mode(tmp_path, monkeypatch, capsys):
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    _centerHead(game)
+    capsys.readouterr()
+
+    game.moveEntity(game.selectedSnakePart, 0)
+
+    assert "[EVENT]" not in capsys.readouterr().out
+
+
+def test_debug_mode_logs_each_move_with_the_cell_the_head_left(
+    tmp_path, monkeypatch, capsys
+):
+    # the label says "moved to", but the coordinates are those of the cell
+    # the head left, not the one it entered (issue #178); this pins what is
+    # printed today, so the fix for that issue flips the expected cell
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    # off the diagonal, so x and y cannot stand in for each other
+    grid = game.environment.getGrid()
+    start = _placeHead(game, grid.getLocationByCoordinates(1, 3))
+    game.config.debug = True
+    capsys.readouterr()
+
+    game.moveEntity(game.selectedSnakePart, 0)
+
+    assert capsys.readouterr().out == (
+        "[EVENT]  "
+        + game.selectedSnakePart.getName()
+        + " moved to ( "
+        + str(start.getX())
+        + " , "
+        + str(start.getY())
+        + " )\n"
+    )
+
+
 def test_a_move_onto_an_empty_cell_neither_grows_nor_scores(tmp_path, monkeypatch):
     game = _makeGame(monkeypatch, tmp_path)
     _clearPickupsFromGrid(game)

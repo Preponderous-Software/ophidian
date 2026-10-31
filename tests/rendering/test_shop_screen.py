@@ -91,6 +91,26 @@ def test_run_navigates_purchases_and_exits_on_escape(pygameGame):
     assert game.saveManager.data["currency"] == 100 - purchased["cost"]
 
 
+def test_run_moving_up_from_the_first_row_wraps_around_the_list(pygameGame):
+    game = pygameGame
+    screen = _makeShopScreen(game)
+    upgrades = listUpgrades()
+    game.saveManager.data["currency"] = 1000
+
+    # K_UP and K_w both step up; two steps from the top land one above the
+    # last row, then RETURN buys whatever is selected there
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_UP))
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_w))
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+
+    asyncio.run(screen.run())
+
+    purchased = upgrades[-2]
+    assert game.saveManager.data["purchasedUpgrades"] == [purchased["id"]]
+    assert game.saveManager.data["currency"] == 1000 - purchased["cost"]
+
+
 def test_run_does_not_purchase_when_already_owned(pygameGame):
     game = pygameGame
     screen = _makeShopScreen(game)

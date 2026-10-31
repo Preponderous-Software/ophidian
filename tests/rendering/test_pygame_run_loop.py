@@ -229,6 +229,23 @@ def test_pygame_loop_quits_when_the_window_is_closed(pygameGame, monkeypatch):
     assert moves == []
 
 
+def test_quitting_the_graphical_ui_shuts_pygame_down(pygameGame, monkeypatch):
+    # graphical mode never builds a TextRenderer (the terminal is not put in
+    # raw mode), so taking the text-UI branch here would raise instead
+    game = pygameGame
+    assert not hasattr(game, "textRenderer")
+    monkeypatch.setattr(Ophidian, "renderObituaryScreen", lambda self: None)
+    monkeypatch.setattr(Ophidian, "displayStatsInConsole", lambda self: None)
+    import builtins
+
+    monkeypatch.setattr(builtins, "quit", lambda: None, raising=False)
+    assert pygame.get_init() is True
+
+    game.quitApplication()
+
+    assert pygame.get_init() is False
+
+
 def test_pygame_loop_resizes_the_cells_to_fit_a_resized_window(pygameGame, monkeypatch):
     game = pygameGame
     monkeypatch.setattr(Ophidian, "quitApplication", lambda self: None)
