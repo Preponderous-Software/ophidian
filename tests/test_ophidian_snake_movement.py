@@ -158,30 +158,21 @@ def test_a_move_is_not_logged_outside_debug_mode(tmp_path, monkeypatch, capsys):
     assert "[EVENT]" not in capsys.readouterr().out
 
 
-def test_debug_mode_logs_each_move_with_the_cell_the_head_left(
+def test_debug_mode_logs_each_move_with_the_cell_the_head_entered(
     tmp_path, monkeypatch, capsys
 ):
-    # the label says "moved to", but the coordinates are those of the cell
-    # the head left, not the one it entered (issue #178); this pins what is
-    # printed today, so the fix for that issue flips the expected cell
     game = _makeGame(monkeypatch, tmp_path)
     _clearPickupsFromGrid(game)
     # off the diagonal, so x and y cannot stand in for each other
     grid = game.environment.getGrid()
-    start = _placeHead(game, grid.getLocationByCoordinates(1, 3))
+    _placeHead(game, grid.getLocationByCoordinates(1, 3))
     game.config.debug = True
     capsys.readouterr()
 
     game.moveEntity(game.selectedSnakePart, 0)
 
     assert capsys.readouterr().out == (
-        "[EVENT]  "
-        + game.selectedSnakePart.getName()
-        + " moved to ( "
-        + str(start.getX())
-        + " , "
-        + str(start.getY())
-        + " )\n"
+        "[EVENT]  " + game.selectedSnakePart.getName() + " moved to ( 1 , 2 )\n"
     )
 
 
