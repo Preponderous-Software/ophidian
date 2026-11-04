@@ -690,9 +690,9 @@ class Ophidian:
                 "[EVENT] ",
                 entity.getName(),
                 "moved to (",
-                location.getX(),
+                newLocation.getX(),
                 ",",
-                location.getY(),
+                newLocation.getY(),
                 ")",
             )
 
