@@ -1,3 +1,6 @@
+import importlib.util
+import sys
+
 import pytest
 
 from config.config import Config
@@ -5,6 +8,7 @@ from level.level import Level
 from food.food import Food
 from powerup.powerup import PowerUp, PowerUpType, getPowerUpDefinition
 from snake.snakePart import SnakePart
+from textui import textrenderer
 from textui.textrenderer import TextRenderer
 
 
@@ -401,6 +405,46 @@ class FakeMsvcrt:
 
     def getch(self):
         return self.keys.pop(0)
+
+
+def loadRendererModuleWithoutUnixTerminalModules(monkeypatch):
+    """A private copy of textrenderer, imported the way Windows imports it.
+
+    None in sys.modules makes an import raise ImportError, as it does for a
+    module Python doesn't ship there. It is a private copy so the module
+    every other test patches by name stays the one that is registered.
+    """
+    monkeypatch.setitem(sys.modules, "termios", None)
+    monkeypatch.setitem(sys.modules, "tty", None)
+    spec = importlib.util.spec_from_file_location(
+        "textrenderer_on_windows", textrenderer.__file__
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_module_imports_without_termios_or_tty(monkeypatch):
+    module = loadRendererModuleWithoutUnixTerminalModules(monkeypatch)
+
+    assert module.termios is None
+    assert module.tty is None
+
+
+def test_a_run_of_key_presses_works_without_termios_or_tty(monkeypatch):
+    module = loadRendererModuleWithoutUnixTerminalModules(monkeypatch)
+    renderer = module.TextRenderer(Config())
+    monkeypatch.setattr(module, "msvcrt", FakeMsvcrt([b"W"]))
+    monkeypatch.setattr("os.name", "nt")
+
+    renderer.enableRawMode()
+    key = renderer.getKeyPress()
+    renderer.disableRawMode()
+    # restore os.name before asserting: pytest cannot build its failure
+    # report while os.name claims to be "nt" on a non-Windows host
+    monkeypatch.undo()
+    assert key == "w"
+    assert renderer.old_settings is None
 
 
 def test_get_key_press_on_windows_returns_none_when_no_key_is_waiting(
