@@ -1,12 +1,20 @@
 import math
 import os
 import sys
-import termios
-import tty
 import select
 
 from controls.keybindings import normalizeTextUiKey
 from scoring.scoring import formatScoreLabel
+
+# Unix-specific imports. Python ships neither module on Windows, so importing
+# them unguarded stopped --text-ui there before any of the Windows branches
+# below could run. Those branches never touch them.
+try:
+    import termios
+    import tty
+except ImportError:
+    termios = None
+    tty = None
 
 # Windows-specific import
 try:
