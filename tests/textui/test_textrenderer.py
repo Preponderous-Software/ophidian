@@ -431,7 +431,7 @@ def test_module_imports_without_termios_or_tty(monkeypatch):
     assert module.tty is None
 
 
-def test_a_run_of_key_presses_works_without_termios_or_tty(monkeypatch):
+def test_raw_mode_and_a_key_press_work_without_termios_or_tty(monkeypatch):
     module = loadRendererModuleWithoutUnixTerminalModules(monkeypatch)
     renderer = module.TextRenderer(Config())
     monkeypatch.setattr(module, "msvcrt", FakeMsvcrt([b"W"]))
