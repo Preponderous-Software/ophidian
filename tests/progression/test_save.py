@@ -3,6 +3,7 @@ import os
 
 import pytest
 
+from progression.cosmetics import checkForNewUnlocks, getUnlockedSkinIds
 from progression.save import SAVE_VERSION, SaveManager, defaultSaveData, migrateSaveData
 from reporting.usage import defaultUsageReportingSettings
 
@@ -208,6 +209,144 @@ def test_stale_lifetime_stats_keep_their_values_and_gain_missing_keys(tmp_path):
     assert stats["totalFoodEaten"] == 0
     assert stats["highestLevelReached"] == 1
     assert set(stats) == set(defaultSaveData()["lifetimeStats"])
+
+
+def _writeSaveWith(path, **fields):
+    saved = defaultSaveData()
+    saved.update(fields)
+    with open(path, "w") as f:
+        json.dump(saved, f)
+
+
+def test_save_file_that_is_not_utf8_falls_back_to_defaults(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "wb") as f:
+        f.write(b"\xff\xfe\x00\x81")
+
+    manager = SaveManager(path)
+
+    assert manager.data == defaultSaveData()
+    assert manager.usageReportingNoticeDue is True
+
+
+@pytest.mark.parametrize(
+    "field, value",
+    [
+        ("lifetimeStats", None),
+        ("lifetimeStats", 5),
+        ("purchasedUpgrades", None),
+        ("ascensionLevel", "3"),
+        ("ascensionLevel", None),
+        ("ascensionLevel", True),
+        ("ascensionLevel", 1.5),
+        ("obituaries", None),
+        ("currency", "lots"),
+        ("unlockedCosmetics", None),
+        ("selectedCosmetic", None),
+        ("ophidianName", 5),
+    ],
+)
+def test_wrong_typed_field_resets_alone(tmp_path, field, value):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, **{"purchasedUpgrades": ["head_start"], field: value})
+    expected = defaultSaveData()
+    if field != "purchasedUpgrades":
+        expected["purchasedUpgrades"] = ["head_start"]
+
+    assert SaveManager(path).data == expected
+
+
+def test_wrong_typed_field_keeps_the_rest_of_the_save(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, currency="lots", ascensionLevel=4, ophidianName="Ada")
+
+    data = SaveManager(path).data
+
+    assert data["currency"] == 0
+    assert data["ascensionLevel"] == 4
+    assert data["ophidianName"] == "Ada"
+
+
+@pytest.mark.parametrize("value", ["12", None, False, [1]])
+def test_wrong_typed_lifetime_stat_resets_alone(tmp_path, value):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, lifetimeStats={"totalRuns": 9, "highestScore": value})
+
+    stats = SaveManager(path).data["lifetimeStats"]
+
+    assert stats["totalRuns"] == 9
+    assert stats["highestScore"] == 0
+
+
+@pytest.mark.parametrize("field", ["purchasedUpgrades", "unlockedCosmetics"])
+def test_non_string_ids_are_dropped_from_id_lists(tmp_path, field):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, **{field: ["default", 5, None, ["x"]]})
+
+    assert SaveManager(path).data[field] == ["default"]
+
+
+@pytest.mark.parametrize("version", ["1", None, [1], {"major": 1}])
+def test_wrong_typed_version_is_stamped_with_the_current_one(tmp_path, version):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, version=version, currency=7)
+
+    manager = SaveManager(path)
+
+    assert manager.data["version"] == SAVE_VERSION
+    assert manager.data["currency"] == 7
+
+
+def test_fields_from_a_newer_version_survive_a_load(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, fieldFromTheFuture={"kept": True})
+
+    assert SaveManager(path).data["fieldFromTheFuture"] == {"kept": True}
+
+
+def test_named_ophidian_survives_a_load(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, ophidianName="Ada")
+
+    assert SaveManager(path).data["ophidianName"] == "Ada"
+
+
+def test_wrong_typed_usage_reporting_still_clears_the_notice(tmp_path):
+    # the block's own type check reads it as off, so the type filter must not
+    # make a present-but-wrong value look like an absent one
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, usageReporting="off", currency=7)
+
+    manager = SaveManager(path)
+
+    assert manager.usageReportingNoticeDue is False
+    assert manager.data["usageReporting"]["enabled"] is False
+    assert manager.data["currency"] == 7
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"lifetimeStats": None},
+        {"lifetimeStats": {"highestScore": None, "longestLength": "3"}},
+        {"obituaries": None},
+        {"currency": "lots"},
+        {"unlockedCosmetics": None},
+        {"unlockedCosmetics": [5]},
+        {"purchasedUpgrades": None},
+    ],
+)
+def test_a_run_can_be_recorded_on_a_repaired_save(tmp_path, fields):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, **fields)
+
+    manager = SaveManager(path)
+    manager.recordRun(length=5, level=2, ticks=100, score=50, causeOfDeath="collision")
+
+    checkForNewUnlocks(manager.data)
+    assert getUnlockedSkinIds(manager.data) == ["default"]
+    assert manager.data["lifetimeStats"]["totalRuns"] == 1
+    assert len(manager.data["obituaries"]) == 1
 
 
 @pytest.mark.parametrize("value", [False, None, "off", 0, []])
