@@ -379,6 +379,52 @@ def test_a_new_segment_prefers_an_occupied_neighbor_over_the_heading_cell(
     assert game.getLocation(head.previousSnakePart) is grid.getRight(corner)
 
 
+def test_a_tail_in_a_bottom_corner_grows_into_the_empty_cell_above_it(
+    tmp_path, monkeypatch
+):
+    # regression test for #186: a body segment's own direction is never set,
+    # so it reads as up, and the only empty cell here used to be excluded,
+    # which stacked the new segment on the head instead
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    grid = game.environment.getGrid()
+    corner = grid.getLocationByCoordinates(0, grid.getColumns() - 1)
+    head = game.selectedSnakePart
+    _placeHead(game, grid.getRight(corner))
+    head.setDirection(3)
+    tail = _attachSegmentBehind(game, head, corner)
+
+    game.spawnSnakePart(tail, tail.getColor())
+
+    assert game.getLocation(tail.previousSnakePart) is grid.getUp(corner)
+    assert grid.getRight(corner).getNumEntities() == 1
+
+
+def test_a_body_segment_grows_away_from_the_cell_the_head_is_facing(
+    tmp_path, monkeypatch
+):
+    # the tail sits beside the head's next cell, and a segment placed there
+    # would be collided with on the next tick
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    grid = game.environment.getGrid()
+    head = game.selectedSnakePart
+    headLocation = _placeHead(game, grid.getLocationByCoordinates(1, 1))
+    head.setDirection(0)
+    tail = _attachSegmentBehind(game, head, grid.getLocationByCoordinates(0, 0))
+    offered = []
+    monkeypatch.setattr(
+        "ophidian.random.choice",
+        lambda candidates: offered.append(candidates) or candidates[0],
+    )
+
+    game.spawnSnakePart(tail, tail.getColor())
+
+    assert len(offered) == 1
+    assert grid.getUp(headLocation) not in offered[0]
+    assert game.getLocation(tail.previousSnakePart) is grid.getLeft(headLocation)
+
+
 def test_a_new_segment_stacks_on_the_part_itself_when_there_are_no_neighbors(
     tmp_path, monkeypatch
 ):

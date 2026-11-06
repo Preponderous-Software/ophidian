@@ -46,11 +46,35 @@ def migrateSaveData(data):
     """Upgrades a loaded save dict to SAVE_VERSION by chaining any
     registered MIGRATIONS, then stamps the current version onto it."""
     version = data.get("version", SAVE_VERSION)
+    if not isinstance(version, int):
+        # a hand-edited value says nothing about the schema, and a list or
+        # object is not even a valid key to look up in MIGRATIONS
+        version = SAVE_VERSION
     while version in MIGRATIONS:
         data = MIGRATIONS[version](data)
         version += 1
     data["version"] = SAVE_VERSION
     return data
+
+
+def hasDefaultType(value, default):
+    """True if a loaded value can stand in for default. The match is exact
+    because a JSON true is an int to isinstance(), and would pass for a
+    count. A default of None marks an optional string."""
+    if default is None:
+        return value is None or isinstance(value, str)
+    return type(value) is type(default)
+
+
+def withoutWrongTypedFields(loaded, defaults):
+    """Returns loaded without the fields that have the wrong type for their
+    default, so each one resets alone and the rest of the save survives.
+    Fields with no default are kept, as they may be from a newer version."""
+    return {
+        key: value
+        for key, value in loaded.items()
+        if key not in defaults or hasDefaultType(value, defaults[key])
+    }
 
 
 class SaveManager:
@@ -72,11 +96,17 @@ class SaveManager:
                     loaded = json.load(f)
                 if isinstance(loaded, dict):
                     loaded = migrateSaveData(loaded)
-                    data.update(loaded)
+                    data.update(withoutWrongTypedFields(loaded, defaultSaveData()))
                     # keep nested defaults for any keys a stale save is missing
                     stats = defaultSaveData()["lifetimeStats"]
-                    stats.update(loaded.get("lifetimeStats", {}))
+                    stats.update(withoutWrongTypedFields(data["lifetimeStats"], stats))
                     data["lifetimeStats"] = stats
+                    # these hold ids: a non-string would break the skin lookup
+                    # and its "Skin selected" notice, so it is dropped alone
+                    for key in ("purchasedUpgrades", "unlockedCosmetics"):
+                        data[key] = [
+                            item for item in data[key] if isinstance(item, str)
+                        ]
                     # same for usageReporting, so a save holding only
                     # {"enabled": false} keeps the default endpoint and key
                     reporting = defaultUsageReportingSettings()
@@ -89,7 +119,7 @@ class SaveManager:
                         reporting["enabled"] = False
                     data["usageReporting"] = reporting
                     self.usageReportingNoticeDue = "usageReporting" not in loaded
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
                 pass
         return data
 

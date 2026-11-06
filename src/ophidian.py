@@ -1029,12 +1029,15 @@ class Ophidian:
         newSnakePart.setNext(snakePart)
         grid, location = self.getLocationAndGrid(snakePart)
 
-        # excludedLocation keeps a new segment out of the cell the snake is
-        # currently facing/heading toward; among the rest, prefer a cell with
+        # excludedLocation keeps a new segment out of the cell the head is
+        # facing, which it enters next; among the rest, prefer a cell with
         # no entities so new segments never silently stack on an existing
-        # snake part or hide a food entity underneath one
+        # snake part or hide a food entity underneath one. Only the head's
+        # direction is ever set, so it has to be the head's that is read
+        head = snakePart.getHead()
+        _, headLocation = self.getLocationAndGrid(head)
         excludedLocation = self.getLocationDirection(
-            snakePart.getDirection(), grid, location
+            head.getDirection(), grid, headLocation
         )
         neighbors = [
             self.getLocationDirection(direction, grid, location)
