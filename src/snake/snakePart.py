@@ -41,6 +41,12 @@ class SnakePart(Entity):
             temp = temp.previousSnakePart
         return temp
 
+    def getHead(self):
+        temp = self
+        while temp.hasNext():
+            temp = temp.nextSnakePart
+        return temp
+
     def getColor(self):
         return self.color
 

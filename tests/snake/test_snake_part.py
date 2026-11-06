@@ -73,3 +73,18 @@ def test_get_tail_from_a_middle_part_finds_the_same_tail():
 def test_get_tail_of_the_tail_is_itself():
     parts = chain(5)
     assert parts[-1].getTail() is parts[-1]
+
+
+def test_get_head_of_lone_part_is_itself():
+    part = SnakePart((10, 20, 30))
+    assert part.getHead() is part
+
+
+def test_get_head_walks_the_whole_chain_from_the_tail():
+    parts = chain(5)
+    assert parts[-1].getHead() is parts[0]
+
+
+def test_get_head_from_a_middle_part_finds_the_same_head():
+    parts = chain(5)
+    assert parts[2].getHead() is parts[0]
