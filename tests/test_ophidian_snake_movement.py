@@ -9,12 +9,14 @@ rather than by a player.
 
 import time
 
+import pytest
+
 from textui.textrenderer import TextRenderer
 
 from food.food import Food
 from lib.pyenvlib.environment import Environment
 from ophidian import Ophidian
-from powerup.powerup import PowerUp
+from powerup.powerup import PowerUp, PowerUpType
 from snake.snakePart import SnakePart
 
 
@@ -377,6 +379,33 @@ def test_a_new_segment_prefers_an_occupied_neighbor_over_the_heading_cell(
 
     # down is the heading, so right (occupied but not excluded) is chosen
     assert game.getLocation(head.previousSnakePart) is grid.getRight(corner)
+
+
+@pytest.mark.parametrize(
+    "makePickup",
+    [lambda: Food((1, 1, 1)), lambda: PowerUp(PowerUpType.SPEED)],
+    ids=["food", "power-up"],
+)
+def test_a_walled_in_tail_stacks_on_the_body_rather_than_cover_a_pickup(
+    tmp_path, monkeypatch, makePickup
+):
+    # regression test for #188: a segment over a pickup hides it, and turns
+    # its cell into a collision (#109). The left cell is offered first, so
+    # the pickup there is only avoided by being filtered out
+    game = _makeGame(monkeypatch, tmp_path)
+    _clearPickupsFromGrid(game)
+    grid = game.environment.getGrid()
+    edge = _placeHead(game, grid.getLocationByCoordinates(2, 0))
+    head = game.selectedSnakePart
+    head.setDirection(0)
+    game.environment.addEntityToLocation(makePickup(), grid.getLeft(edge))
+    game.environment.addEntityToLocation(SnakePart((2, 2, 2)), grid.getDown(edge))
+    game.environment.addEntityToLocation(SnakePart((3, 3, 3)), grid.getRight(edge))
+    monkeypatch.setattr("ophidian.random.choice", lambda candidates: candidates[0])
+
+    game.spawnSnakePart(head, head.getColor())
+
+    assert game.getLocation(head.previousSnakePart) is grid.getDown(edge)
 
 
 def test_a_tail_in_a_bottom_corner_grows_into_the_empty_cell_above_it(

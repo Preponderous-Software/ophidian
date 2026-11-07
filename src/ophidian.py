@@ -1024,9 +1024,80 @@ class Ophidian:
             return grid.getRight(location)
 
     def spawnSnakePart(self, snakePart: SnakePart, color):
+        self.attachSnakePart(
+            snakePart, color, self.chooseLocationForNewSegment(snakePart)
+        )
+
+    def attachSnakePart(self, snakePart: SnakePart, color, location):
         newSnakePart = SnakePart(color)
         snakePart.setPrevious(newSnakePart)
         newSnakePart.setNext(snakePart)
+        self.environment.addEntityToLocation(newSnakePart, location)
+        self.snakeParts.append(newSnakePart)
+
+    def spawnStartingSegments(self, count):
+        """Grows the body a run starts with, as one path laid out in advance.
+
+        Growing it a random neighbor at a time let the tail wall itself in,
+        which stacked the next segment on the body (see issue #188). Only a
+        board too small to hold the path falls back to that, and no board
+        the game builds is: 8 parts always fit on the smallest, 5x5.
+        """
+        head = self.selectedSnakePart
+        path = self.findStartingBodyPath(count)
+        if path is None:
+            for _ in range(count):
+                self.spawnSnakePart(head.getTail(), head.getColor())
+            return
+        for location in path:
+            self.attachSnakePart(head.getTail(), head.getColor(), location)
+
+    def findStartingBodyPath(self, length):
+        """A random path of `length` cells leading away from the head, or
+        None if there isn't one. It shares no cell with itself or the head,
+        and stays out of the cell the head enters next.
+
+        Searches depth-first so that a walk which boxes itself in backs up
+        and tries another turn. Expects the head to be alone on the board.
+        """
+        grid = self.environment.getGrid()
+        head = self.selectedSnakePart
+        headLocation = self.getLocation(head)
+        excludedLocation = self.getLocationDirection(
+            head.getDirection(), grid, headLocation
+        )
+
+        def extend(path):
+            if len(path) == length + 1:
+                return path[1:]
+            neighbors = [
+                self.getLocationDirection(direction, grid, path[-1])
+                for direction in range(4)
+            ]
+            candidates = [
+                neighbor
+                for neighbor in neighbors
+                if neighbor != -1
+                and neighbor != excludedLocation
+                and neighbor not in path
+            ]
+            random.shuffle(candidates)
+            for candidate in candidates:
+                found = extend(path + [candidate])
+                if found is not None:
+                    return found
+            return None
+
+        return extend([headLocation])
+
+    def holdsPickup(self, location):
+        for eid in location.getEntities():
+            entity = location.getEntity(eid)
+            if type(entity) is Food or type(entity) is PowerUp:
+                return True
+        return False
+
+    def chooseLocationForNewSegment(self, snakePart: SnakePart):
         grid, location = self.getLocationAndGrid(snakePart)
 
         # excludedLocation keeps a new segment out of the cell the head is
@@ -1050,22 +1121,27 @@ class Ophidian:
             if neighbor != excludedLocation and neighbor.getNumEntities() == 0
         ]
         if emptyCandidates:
-            targetLocation = random.choice(emptyCandidates)
-        elif onGridNeighbors:
+            return random.choice(emptyCandidates)
+        if onGridNeighbors:
             # every unoccupied neighbor is taken (or the only one is
             # excluded) - fall back to any on-grid neighbor rather than
-            # looping forever or crashing on a full grid
+            # looping forever or crashing on a full grid. Stacking on the
+            # body is preferred to covering a pickup, which moveEntity()
+            # would treat as a collision (see issues #109 and #188)
             fallbackCandidates = [
                 neighbor for neighbor in onGridNeighbors if neighbor != excludedLocation
             ] or onGridNeighbors
-            targetLocation = random.choice(fallbackCandidates)
-        else:
-            # no on-grid neighbors at all (grid too small to have any) -
-            # stack on the current location rather than crashing
-            targetLocation = location
-
-        self.environment.addEntityToLocation(newSnakePart, targetLocation)
-        self.snakeParts.append(newSnakePart)
+            return random.choice(
+                [
+                    neighbor
+                    for neighbor in fallbackCandidates
+                    if not self.holdsPickup(neighbor)
+                ]
+                or fallbackCandidates
+            )
+        # no on-grid neighbors at all (grid too small to have any) - stack on
+        # the current location rather than crashing
+        return location
 
     def spawnPickup(self):
         """Spawns the next collectible on the board.
@@ -1247,18 +1323,14 @@ class Ophidian:
         self.environment.addEntity(self.selectedSnakePart)
         self.snakeParts.append(self.selectedSnakePart)
         # head_start upgrade: begin the run with 2 extra pre-grown segments
-        if "head_start" in purchasedUpgrades:
-            for _ in range(2):
-                self.spawnSnakePart(
-                    self.selectedSnakePart.getTail(), self.selectedSnakePart.getColor()
-                )
+        startingSegments = 2 if "head_start" in purchasedUpgrades else 0
+        if self.ascensionBonus is not None:
+            startingSegments += self.ascensionBonus["startingBonusSegments"]
+        self.spawnStartingSegments(startingSegments)
         ophidianName = self.saveManager.data["ophidianName"]
         self.notify(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
+        # after the body, so that no segment is ever laid over the pickup
         self.spawnPickup()
-        if self.ascensionBonus is not None:
-            for _ in range(self.ascensionBonus["startingBonusSegments"]):
-                tail = self.selectedSnakePart.getTail()
-                self.spawnSnakePart(tail, tail.getColor())
 
     def endOfTick(self):
         """Closes out one movement step, for both UI loops.

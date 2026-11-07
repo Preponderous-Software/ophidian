@@ -7,11 +7,13 @@ segments the snake starts with, and whether Second Wind is armed.
 """
 
 import json
+import random
 
 import pytest
 
 from textui.textrenderer import TextRenderer
 
+from lib.pyenvlib.environment import Environment
 from ophidian import Ophidian
 
 
@@ -109,6 +111,100 @@ def test_head_start_and_ascension_segments_stack(tmp_path, monkeypatch):
 
     assert len(game.snakeParts) == 5
     assert _chainLength(game.selectedSnakePart) == 5
+
+
+def _adjacent(first, second):
+    return abs(first.getX() - second.getX()) + abs(first.getY() - second.getY()) == 1
+
+
+def test_the_longest_starting_body_never_stacks_and_never_covers_the_pickup(
+    tmp_path, monkeypatch
+):
+    # regression test for #188: the longest start the game can produce, on
+    # its smallest board, where growing one random neighbor at a time stacked
+    # segments in roughly one run in eight
+    game = _makeGame(monkeypatch, tmp_path, purchasedUpgrades=["head_start"])
+    game.ascensionBonus = {"tickSpeedMultiplier": 1, "startingBonusSegments": 5}
+    random.seed(188)
+
+    for _ in range(300):
+        game.initialize()
+
+        grid = game.environment.getGrid()
+        locations = [game.getLocation(part) for part in game.snakeParts]
+        assert len(locations) == 8
+        assert len(set(locations)) == 8
+        for first, second in zip(locations, locations[1:]):
+            assert _adjacent(first, second)
+        head = game.selectedSnakePart
+        headedFor = game.getLocationDirection(head.getDirection(), grid, locations[0])
+        assert headedFor not in locations
+        assert grid.getNumEntities() == 9
+        for location in grid.getLocations().values():
+            assert location.getNumEntities() <= 1
+
+
+def test_the_starting_body_is_linked_from_head_to_tail_in_the_head_color(
+    tmp_path, monkeypatch
+):
+    game = _makeGame(monkeypatch, tmp_path, purchasedUpgrades=["head_start"])
+    game.ascensionBonus = {"tickSpeedMultiplier": 1, "startingBonusSegments": 1}
+
+    game.initialize()
+
+    part = game.selectedSnakePart
+    for expected in game.snakeParts[1:]:
+        assert part.previousSnakePart is expected
+        assert expected.nextSnakePart is part
+        assert expected.getColor() == game.selectedSnakePart.getColor()
+        part = expected
+
+
+def test_the_starting_body_search_backs_out_of_a_dead_end(tmp_path, monkeypatch):
+    # from the middle of a 3x3 facing up, the first turns tried lead into the
+    # top left corner, and only backing up finds a path 5 cells long
+    game = _makeGame(monkeypatch, tmp_path)
+    game.environment = Environment("small", 3)
+    game.snakeParts = []
+    head = game.selectedSnakePart
+    grid = game.environment.getGrid()
+    game.environment.addEntityToLocation(head, grid.getLocationByCoordinates(1, 1))
+    head.setDirection(0)
+    monkeypatch.setattr("ophidian.random.shuffle", lambda candidates: None)
+
+    path = game.findStartingBodyPath(5)
+
+    assert [(cell.getX(), cell.getY()) for cell in path] == [
+        (0, 1),
+        (0, 2),
+        (1, 2),
+        (2, 2),
+        (2, 1),
+    ]
+
+
+def test_a_board_too_small_for_the_starting_body_still_grants_every_segment(
+    tmp_path, monkeypatch
+):
+    # a 2x2 board has 3 free cells at most, and one is the heading, so a path
+    # of 3 can't exist; falling back keeps the segments the player paid for
+    game = _makeGame(monkeypatch, tmp_path, purchasedUpgrades=["head_start"])
+    game.ascensionBonus = {"tickSpeedMultiplier": 1, "startingBonusSegments": 1}
+    game.config.gridSize = 2
+    game.config.minGridSize = 2
+    monkeypatch.setattr(
+        Environment,
+        "addEntity",
+        lambda self, entity: self.addEntityToLocation(
+            entity, self.getGrid().getLocationByCoordinates(0, 1)
+        ),
+    )
+
+    game.initialize()
+
+    assert game.findStartingBodyPath(3) is None
+    assert len(game.snakeParts) == 4
+    assert _chainLength(game.selectedSnakePart) == 4
 
 
 def test_tick_speed_bonuses_do_not_compound_across_runs(tmp_path, monkeypatch):
