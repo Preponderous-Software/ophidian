@@ -246,10 +246,12 @@ To turn it off, any one of these is enough:
   an object, such as `"usageReporting": false`, is also read as off)
 - set the environment variable `TRACE_USAGE_REPORTING=off` (also `false`, `0`, `no`), which
   turns off every program that reports to trace
-- set the environment variable `DO_NOT_TRACK=1` (see [consoledonottrack.com](https://consoledonottrack.com))
+- set the environment variable `DO_NOT_TRACK=1` (also `true`, `yes`; see [consoledonottrack.com](https://consoledonottrack.com))
 
-The environment variables win over `save.json`. `endpoint` is where events are posted and
-`key` identifies the game to the server; neither normally needs changing. The client itself
+The values of both variables are read regardless of case. Any other value, an empty one
+included, does not turn reporting off: `DO_NOT_TRACK=0` or `TRACE_USAGE_REPORTING=on` leave
+the choice to `save.json`. The environment variables win over `save.json`. `endpoint` is
+where events are posted and `key` identifies the game to the server; neither normally needs changing. The client itself
 is a vendored copy of [trace-client-python](https://github.com/Stephenson-Software/trace-client-python)
 at `src/lib/trace_client.py`, and the test suite never contacts the real server.
 
