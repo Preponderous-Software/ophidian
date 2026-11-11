@@ -250,8 +250,8 @@ To turn it off, any one of these is enough:
 
 The values of both variables are read regardless of case. Any other value, an empty one
 included, does not turn reporting off: `DO_NOT_TRACK=0` or `TRACE_USAGE_REPORTING=on` leave
-the choice to `save.json`. The environment variables win over `save.json`. `endpoint` is where events are posted and
-`key` identifies the game to the server; neither normally needs changing. The client itself
+the choice to `save.json`. The environment variables win over `save.json`. `endpoint` is
+where events are posted and `key` identifies the game to the server; neither normally needs changing. The client itself
 is a vendored copy of [trace-client-python](https://github.com/Stephenson-Software/trace-client-python)
 at `src/lib/trace_client.py`, and the test suite never contacts the real server.
 
