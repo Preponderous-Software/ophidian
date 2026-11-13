@@ -1,5 +1,3 @@
-import pytest
-
 from lib.pyenvlib.entity import Entity
 from lib.pyenvlib.grid import Grid
 
@@ -80,15 +78,42 @@ def test_add_entity_to_location_puts_it_in_that_location():
     assert grid.getNumEntities() == 1
 
 
-@pytest.mark.skip(
-    reason="addEntityToLocation stores the bound getID method as the grid ID, "
-    "not the grid's id - see issue #195"
-)
 def test_add_entity_to_location_stamps_the_grid_id():
     grid = Grid(3, 3)
     entity = Entity("thing")
     grid.addEntityToLocation(entity, grid.getLocationByCoordinates(0, 0))
     assert entity.getGridID() == grid.getID()
+
+
+def test_is_entity_present_finds_an_entity_anywhere_on_the_grid():
+    grid = Grid(3, 3)
+    entity = Entity("thing")
+    grid.addEntityToLocation(entity, grid.getLocationByCoordinates(2, 1))
+    assert grid.isEntityPresent(entity) is True
+
+
+def test_is_entity_present_is_false_for_an_entity_not_on_the_grid():
+    grid = Grid(3, 3)
+    grid.addEntity(Entity("other"))
+    assert grid.isEntityPresent(Entity("thing")) is False
+
+
+def test_remove_location_drops_only_that_location():
+    grid = Grid(3, 3)
+    target = grid.getLocationByCoordinates(1, 1)
+    grid.removeLocation(target)
+    assert grid.getSize() == 8
+    assert target.getID() not in grid.getLocations()
+    assert grid.getLocationByCoordinates(1, 1) == -1
+    assert grid.getLocationByCoordinates(0, 0) != -1
+
+
+def test_get_first_location_is_the_first_one_generated():
+    # locations are generated column by column, so (0, 0) comes first
+    grid = Grid(3, 3)
+    first = grid.getFirstLocation()
+    assert (first.getX(), first.getY()) == (0, 0)
+    assert first is next(iter(grid.getLocations().values()))
 
 
 def test_get_entity_searches_every_location():

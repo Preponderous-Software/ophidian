@@ -36,7 +36,7 @@ class Grid(object):
 
     # Returns the first location in this grid.
     def getFirstLocation(self):
-        return self.locations[0]
+        return next(iter(self.locations.values()))
 
     # Returns the number of locations in this grid.
     def getSize(self):
@@ -72,7 +72,7 @@ class Grid(object):
 
     # Removes a location from this grid.
     def removeLocation(self, location: Location):
-        self.locations.remove(location)
+        del self.locations[location.getID()]
 
     # Adds an entity to a random location in this grid.
     def addEntity(self, entity: Entity):
@@ -81,7 +81,7 @@ class Grid(object):
 
     # Adds an entity to a specified location in this grid.
     def addEntityToLocation(self, entity: Entity, location):
-        entity.setGridID(self.getID)
+        entity.setGridID(self.getID())
 
         self.locations[location.getID()].addEntity(entity)
 
@@ -95,10 +95,11 @@ class Grid(object):
 
     # Checks if an entity is present in this grid.
     def isEntityPresent(self, entity: Entity):
-        for locationId in self.grid.getLocations():
+        for locationId in self.locations:
             location = self.locations[locationId]
             if location.isEntityPresent(entity):
                 return True
+        return False
 
     # Generates the locations based on the columns and rows. Assumes an empty locations array.
     def generateLocations(self):
