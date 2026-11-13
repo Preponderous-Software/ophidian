@@ -28,6 +28,14 @@ def test_add_entity_to_location_uses_that_location():
     assert target.isEntityPresent(entity)
 
 
+def test_is_entity_present_reflects_whether_it_was_added():
+    environment = Environment("board", 3)
+    entity = Entity("thing")
+    assert environment.isEntityPresent(entity) is False
+    environment.addEntity(entity)
+    assert environment.isEntityPresent(entity) is True
+
+
 def test_remove_entity_takes_it_off_the_grid():
     environment = Environment("board", 3)
     entity = Entity("thing")
