@@ -1,3 +1,5 @@
+import datetime
+
 from lib.pyenvlib.entity import Entity
 from lib.pyenvlib.environment import Environment
 
@@ -50,3 +52,40 @@ def test_set_grid_replaces_the_grid():
     replacement = Environment("other", 5).getGrid()
     environment.setGrid(replacement)
     assert environment.getGrid() is replacement
+
+
+def test_new_environment_is_stamped_with_the_time_it_was_made():
+    before = datetime.datetime.now()
+    environment = Environment("board", 2)
+    after = datetime.datetime.now()
+    assert before <= environment.getCreationDate() <= after
+
+
+def test_set_id_and_set_name_replace_those_fields():
+    environment = Environment("board", 2)
+    environment.setID("environment-id")
+    environment.setName("renamed")
+    assert environment.getID() == "environment-id"
+    assert environment.getName() == "renamed"
+
+
+def test_add_entity_stamps_an_id_set_with_set_id():
+    environment = Environment("board", 2)
+    environment.setID("environment-id")
+    entity = Entity("thing")
+    environment.addEntity(entity)
+    assert entity.getEnvironmentID() == "environment-id"
+
+
+def test_print_info_prints_the_counts_and_ids(capsys):
+    environment = Environment("board", 3)
+    environment.setID("environment-id")
+    environment.getGrid().setID("grid-id")
+    environment.addEntity(Entity("thing"))
+    environment.printInfo()
+    out = capsys.readouterr().out
+    assert "board" in out
+    assert "Num entities:  1" in out
+    assert "Num locations:  9" in out
+    assert "ID:  environment-id" in out
+    assert "Grid ID:  grid-id" in out
