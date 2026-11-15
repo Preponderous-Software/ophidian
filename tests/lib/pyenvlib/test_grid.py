@@ -152,3 +152,35 @@ def test_get_random_location_returns_one_of_the_grids_locations():
     for _ in range(20):
         chosen = grid.getRandomLocation()
         assert any(chosen is loc for loc in locations)
+
+
+def test_set_id_replaces_the_id():
+    grid = Grid(2, 2)
+    grid.setID("grid-id")
+    assert grid.getID() == "grid-id"
+
+
+def test_set_columns_and_rows_change_the_dimensions_but_not_the_locations():
+    grid = Grid(2, 2)
+    grid.setColumns(5)
+    grid.setRows(4)
+    assert grid.getColumns() == 5
+    assert grid.getRows() == 4
+    assert grid.getSize() == 4
+    assert grid.getLocationByCoordinates(4, 3) == -1
+
+
+def test_set_locations_replaces_the_location_map():
+    grid = Grid(2, 2)
+    replacement = Grid(3, 1).getLocations()
+    grid.setLocations(replacement)
+    assert grid.getLocations() is replacement
+    assert grid.getSize() == 3
+
+
+def test_add_location_keys_it_by_its_own_id():
+    grid = Grid(1, 1)
+    extra = Grid(1, 1).getFirstLocation()
+    grid.addLocation(extra)
+    assert grid.getSize() == 2
+    assert grid.getLocations()[extra.getID()] is extra
