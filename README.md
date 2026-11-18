@@ -142,9 +142,9 @@ place name.
 Both UIs show how much of the grid the ophidian fills. The graphical UI draws it as a bar
 along the bottom of the window: red below a quarter of the grid, yellow below half, and
 green from half up. The text UI prints it as `Progress: N%` with a `[███░░░]` bar under the
-score, without colours. Every board is an odd number of cells wide, so no run can fill
-exactly half: once the bar is green, ending the run sends the next one a level higher (or,
-from level 6, ascends).
+score, without colours. Every board is an odd number of cells wide and tall, so no run can
+fill exactly half: once the bar is green, a collision or `r` sends the next run a level
+higher (or, from level 6, ascends).
 
 ### Currency and the upgrade shop
 Every run that ends — in a collision, with `r` or with `q` — banks one currency for each
