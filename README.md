@@ -139,6 +139,13 @@ grid sends the next run one level higher. Each level adds two to the width and h
 the board, from 5×5 on level 1 to a cap of 15×15 on level 6, and gives the board its own
 place name.
 
+Both UIs show how much of the grid the ophidian fills. The graphical UI draws it as a bar
+along the bottom of the window: red below a quarter of the grid, yellow below half, and
+green from half up. The text UI prints it as `Progress: N%` with a `[███░░░]` bar under the
+score, without colours. Every board is an odd number of cells wide, so no run can fill
+exactly half: once the bar is green, ending the run sends the next one a level higher (or,
+from level 6, ascends).
+
 ### Currency and the upgrade shop
 Every run that ends — in a collision, with `r` or with `q` — banks one currency for each
 segment the ophidian finished with beyond its head. Currency is spent in the shop (`p`) on
@@ -267,7 +274,7 @@ Name | Main Contributions
 Daniel Stephenson | Creator
 
 ## Libraries
-This project makes use of [graphik](https://github.com/Preponderous-Software/graphik) and [py_env_lib](https://github.com/Preponderous-Software/py_env_lib).
+This project makes use of [graphik](https://github.com/Preponderous-Software/graphik), [py_env_lib](https://github.com/Preponderous-Software/py_env_lib) and [trace-client-python](https://github.com/Stephenson-Software/trace-client-python), vendored under `src/lib/`.
 
 ## 📄 License
 
