@@ -149,7 +149,9 @@ def test_opt_out_survives_reload_and_keeps_the_default_endpoint_and_key(tmp_path
     )
 
 
-@pytest.mark.parametrize("content", ['{"currency": 40, ', "[]", "null", '"off"', "false"])
+@pytest.mark.parametrize(
+    "content", ['{"currency": 40, ', "[]", "null", '"off"', "false"]
+)
 def test_unreadable_save_falls_back_to_defaults_with_usage_reporting_off(
     tmp_path, content
 ):
