@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 
 from lib.trace_client import environment_opts_out
-from reporting.usage import defaultUsageReportingSettings
+from reporting.usage import defaultUsageReportingSettings, hasNearMissOptOut
 
 # @author Daniel McCoy Stephenson
 # @since July 4th, 2026
@@ -102,6 +102,10 @@ class SaveManager:
                 if not isinstance(loaded, dict):
                     raise ValueError("save.json is not a JSON object")
                 if isinstance(loaded, dict):
+                    # read before the update below: a hand-edited
+                    # usageReporting block without "enabled" replaces the
+                    # default one, and indexing it would raise
+                    enabledByDefault = data["usageReporting"]["enabled"]
                     loaded = migrateSaveData(loaded)
                     data.update(withoutWrongTypedFields(loaded, defaultSaveData()))
                     # keep nested defaults for any keys a stale save is missing
@@ -116,15 +120,19 @@ class SaveManager:
                         ]
                     # same for usageReporting, so a save holding only
                     # {"enabled": false} keeps the default endpoint and key
-                    reporting = defaultUsageReportingSettings(
-                        data["usageReporting"]["enabled"]
-                    )
+                    reporting = defaultUsageReportingSettings(enabledByDefault)
                     if isinstance(loaded.get("usageReporting"), dict):
                         reporting.update(loaded["usageReporting"])
                     elif "usageReporting" in loaded:
                         # a value that is present but not an object (e.g. a
                         # hand-edited false) reads as off, never as on - the
                         # same way createUsageReporter treats non-dict settings
+                        reporting["enabled"] = False
+                    if hasNearMissOptOut(loaded):
+                        # an opt-out written under another spelling
+                        # (usage_reporting, an "enable" switch, "disabled":
+                        # true, ...) is an opt-out: the real switch is
+                        # recorded off, so it is saved that way
                         reporting["enabled"] = False
                     data["usageReporting"] = reporting
                     self.usageReportingNoticeDue = "usageReporting" not in loaded

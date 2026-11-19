@@ -7,6 +7,7 @@ from progression import save
 from reporting.usage import (
     FIRST_RUN_NOTICE,
     FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT,
+    FIRST_RUN_NOTICE_OFF_BY_SAVE,
     defaultUsageReportingSettings,
 )
 from textui.textrenderer import TextRenderer
@@ -165,3 +166,20 @@ def test_first_run_under_an_environment_opt_out_says_reporting_is_off(
         assert json.load(f)["usageReporting"] == defaultUsageReportingSettings(
             enabled=False
         )
+
+
+def test_first_run_over_a_near_miss_opt_out_says_reporting_is_off(
+    tmp_path, monkeypatch, capsys
+):
+    with open(os.path.join(tmp_path, "save.json"), "w") as f:
+        json.dump({"usage_reporting": {"enabled": False}}, f)
+    built = _recordReporters(monkeypatch)
+
+    _makeGame(monkeypatch, tmp_path)
+
+    out = capsys.readouterr().out
+    assert FIRST_RUN_NOTICE not in out
+    assert out.count(FIRST_RUN_NOTICE_OFF_BY_SAVE) == 1
+    assert built[0][0]["enabled"] is False
+    with open(os.path.join(tmp_path, "save.json")) as f:
+        assert json.load(f)["usageReporting"]["enabled"] is False
