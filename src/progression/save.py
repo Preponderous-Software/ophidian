@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timezone
 
+from lib.trace_client import environment_opts_out
 from reporting.usage import defaultUsageReportingSettings
 
 # @author Daniel McCoy Stephenson
@@ -90,10 +91,16 @@ class SaveManager:
 
     def _load(self):
         data = defaultSaveData()
+        # A save written for the first time under TRACE_USAGE_REPORTING=off
+        # or DO_NOT_TRACK=1 records reporting as off, so a later start
+        # without the variable does not quietly turn it on.
+        data["usageReporting"]["enabled"] = not environment_opts_out()
         if os.path.exists(self.path):
             try:
                 with open(self.path, "r") as f:
                     loaded = json.load(f)
+                if not isinstance(loaded, dict):
+                    raise ValueError("save.json is not a JSON object")
                 if isinstance(loaded, dict):
                     loaded = migrateSaveData(loaded)
                     data.update(withoutWrongTypedFields(loaded, defaultSaveData()))
@@ -109,7 +116,9 @@ class SaveManager:
                         ]
                     # same for usageReporting, so a save holding only
                     # {"enabled": false} keeps the default endpoint and key
-                    reporting = defaultUsageReportingSettings()
+                    reporting = defaultUsageReportingSettings(
+                        data["usageReporting"]["enabled"]
+                    )
                     if isinstance(loaded.get("usageReporting"), dict):
                         reporting.update(loaded["usageReporting"])
                     elif "usageReporting" in loaded:
@@ -119,8 +128,13 @@ class SaveManager:
                         reporting["enabled"] = False
                     data["usageReporting"] = reporting
                     self.usageReportingNoticeDue = "usageReporting" not in loaded
-            except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-                pass
+            except (ValueError, UnicodeDecodeError, OSError):
+                # The save cannot be read, so whether it had reporting
+                # switched off cannot be known: fail closed. Reporting stays
+                # off (and the next save records that) rather than the
+                # defaults turning it back on, and no notice claims it is on.
+                data["usageReporting"]["enabled"] = False
+                self.usageReportingNoticeDue = False
         return data
 
     def save(self):

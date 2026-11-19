@@ -41,10 +41,12 @@ FIRST_RUN_NOTICE = (
 )
 
 # What the first run says instead when TRACE_USAGE_REPORTING=off or
-# DO_NOT_TRACK=1 is already set: the save still gets its block, but claiming
-# reporting is on would be untrue.
+# DO_NOT_TRACK=1 is already set: the save gets its block with reporting off
+# (SaveManager), so a later start without the variable does not report.
 FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT = (
-    "Usage reporting is off (environment). Details: " + DETAILS_URL
+    "Usage reporting is off (environment), and "
+    '"usageReporting": {"enabled": false} is saved in save.json so it stays '
+    "off. Details: " + DETAILS_URL
 )
 
 
@@ -72,11 +74,11 @@ def firstRunNotice():
     return FIRST_RUN_NOTICE
 
 
-def defaultUsageReportingSettings():
+def defaultUsageReportingSettings(enabled=True):
     """The usageReporting block a fresh save.json gets. Reporting is on by
     default; the block is where a player turns it off."""
     return {
-        "enabled": True,
+        "enabled": enabled,
         "endpoint": DEFAULT_ENDPOINT,
         "key": DEFAULT_KEY,
     }
@@ -149,6 +151,8 @@ def createUsageReporter(settings, version=None):
         settings = {}
         enabled = False
     else:
+        # fails closed: only a JSON true reports; false, "false", "off", 0,
+        # null or a typo do not
         enabled = settings.get("enabled", True) is True
     endpoint = settings.get("endpoint") or DEFAULT_ENDPOINT
     if not isinstance(endpoint, str):

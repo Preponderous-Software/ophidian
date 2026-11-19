@@ -251,13 +251,18 @@ To turn it off, any one of these is enough:
 
 - set `"enabled": false` in that block of `save.json` (a `usageReporting` value that is not
   an object, such as `"usageReporting": false`, is also read as off)
-- set the environment variable `TRACE_USAGE_REPORTING=off` (also `false`, `0`, `no`), which
-  turns off every program that reports to trace
-- set the environment variable `DO_NOT_TRACK=1` (also `true`, `yes`; see [consoledonottrack.com](https://consoledonottrack.com))
+- set the environment variable `TRACE_USAGE_REPORTING=off`, which turns off every program
+  that reports to trace (any value other than blank, `true`, `on`, `yes` or `1` turns it off)
+- set the environment variable `DO_NOT_TRACK=1` (any value other than blank, `0`, `false`,
+  `off` or `no` turns it off; see [consoledonottrack.com](https://consoledonottrack.com))
 
-The values of both variables are read regardless of case. Any other value, an empty one
-included, does not turn reporting off: `DO_NOT_TRACK=0` or `TRACE_USAGE_REPORTING=on` leave
-the choice to `save.json`. The environment variables win over `save.json`. `endpoint` is
+The values of both variables are read regardless of case; a blank value, `DO_NOT_TRACK=0` or
+`TRACE_USAGE_REPORTING=on` leave the choice to `save.json`. The environment variables win over
+`save.json`. Every switch fails closed: only `"enabled": true` reports, so `"false"`, `"off"`,
+`0` or `null` keep reporting off. If either variable already turns reporting off the first
+time the block is written, it is written with `"enabled": false`, so reporting stays off on
+later starts without the variable. A `save.json` that cannot be read is treated as having
+reporting off, and the next save records that. `endpoint` is
 where events are posted and `key` identifies the game to the server; neither normally needs changing. The client itself
 is a vendored copy of [trace-client-python](https://github.com/Stephenson-Software/trace-client-python)
 at `src/lib/trace_client.py`, and the test suite never contacts the real server.
