@@ -149,15 +149,73 @@ def test_opt_out_survives_reload_and_keeps_the_default_endpoint_and_key(tmp_path
     )
 
 
-def test_corrupt_save_file_falls_back_to_defaults_and_owes_the_notice(tmp_path):
+@pytest.mark.parametrize("content", ['{"currency": 40, ', "[]", "null", '"off"', "false"])
+def test_unreadable_save_falls_back_to_defaults_with_usage_reporting_off(
+    tmp_path, content
+):
+    # a save that cannot be read may have had reporting switched off, so the
+    # defaults must not switch it back on, nor a notice claim it is on
     path = os.path.join(tmp_path, "save.json")
     with open(path, "w") as f:
-        f.write('{"currency": 40, ')
+        f.write(content)
 
     manager = SaveManager(path)
 
-    assert manager.data == defaultSaveData()
+    expected = defaultSaveData()
+    expected["usageReporting"]["enabled"] = False
+    assert manager.data == expected
+    assert manager.usageReportingNoticeDue is False
+
+
+def test_unreadable_save_keeps_usage_reporting_off_once_saved_over(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        f.write('{"usageReporting": {"enabled": false}, ')
+
+    SaveManager(path).save()
+
+    assert SaveManager(path).data["usageReporting"]["enabled"] is False
+
+
+def test_new_save_under_an_environment_opt_out_records_reporting_off(
+    tmp_path, monkeypatch
+):
+    path = os.path.join(tmp_path, "save.json")
+    monkeypatch.setenv("DO_NOT_TRACK", "1")
+    SaveManager(path).save()
+    monkeypatch.delenv("DO_NOT_TRACK")
+
+    assert SaveManager(path).data["usageReporting"]["enabled"] is False
+
+
+def test_save_predating_usage_reporting_under_an_environment_opt_out_records_off(
+    tmp_path, monkeypatch
+):
+    path = os.path.join(tmp_path, "save.json")
+    old = defaultSaveData()
+    del old["usageReporting"]
+    old["currency"] = 7
+    with open(path, "w") as f:
+        json.dump(old, f)
+    monkeypatch.setenv("TRACE_USAGE_REPORTING", "off")
+
+    manager = SaveManager(path)
+
+    assert manager.data["usageReporting"]["enabled"] is False
+    assert manager.data["currency"] == 7
     assert manager.usageReportingNoticeDue is True
+
+
+@pytest.mark.parametrize("value", ["false", "off", "no", "0", 0, None])
+def test_an_explicit_off_is_never_rewritten_as_on(tmp_path, value):
+    path = os.path.join(tmp_path, "save.json")
+    _writeSaveWith(path, usageReporting={"enabled": value})
+
+    manager = SaveManager(path)
+    manager.recordRun(length=2, level=1, ticks=3, score=4, causeOfDeath="quit")
+
+    with open(path) as f:
+        assert json.load(f)["usageReporting"]["enabled"] == value
 
 
 def test_corrupt_save_file_is_overwritten_by_the_next_save(tmp_path):
@@ -180,8 +238,8 @@ def test_save_file_holding_a_non_object_is_ignored(tmp_path):
 
     manager = SaveManager(path)
 
-    assert manager.data == defaultSaveData()
-    assert manager.usageReportingNoticeDue is True
+    assert manager.data == _defaultsWithUsageReportingOff()
+    assert manager.usageReportingNoticeDue is False
 
 
 def test_unreadable_save_path_falls_back_to_defaults(tmp_path):
@@ -192,7 +250,7 @@ def test_unreadable_save_path_falls_back_to_defaults(tmp_path):
 
     manager = SaveManager(path)
 
-    assert manager.data == defaultSaveData()
+    assert manager.data == _defaultsWithUsageReportingOff()
 
 
 def test_stale_lifetime_stats_keep_their_values_and_gain_missing_keys(tmp_path):
@@ -211,6 +269,14 @@ def test_stale_lifetime_stats_keep_their_values_and_gain_missing_keys(tmp_path):
     assert set(stats) == set(defaultSaveData()["lifetimeStats"])
 
 
+def _defaultsWithUsageReportingOff():
+    # what an unreadable save loads as: it may have had reporting switched
+    # off, so the defaults must not switch it back on
+    data = defaultSaveData()
+    data["usageReporting"]["enabled"] = False
+    return data
+
+
 def _writeSaveWith(path, **fields):
     saved = defaultSaveData()
     saved.update(fields)
@@ -225,8 +291,8 @@ def test_save_file_that_is_not_utf8_falls_back_to_defaults(tmp_path):
 
     manager = SaveManager(path)
 
-    assert manager.data == defaultSaveData()
-    assert manager.usageReportingNoticeDue is True
+    assert manager.data == _defaultsWithUsageReportingOff()
+    assert manager.usageReportingNoticeDue is False
 
 
 @pytest.mark.parametrize(

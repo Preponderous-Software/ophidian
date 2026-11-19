@@ -105,6 +105,10 @@ def test_disabled_settings_yield_a_reporter_that_sends_nothing():
         "not a dict",
         {"enabled": False, "endpoint": DEFAULT_ENDPOINT, "key": "k"},
         {"enabled": "true", "endpoint": DEFAULT_ENDPOINT, "key": "k"},
+        {"enabled": "false", "endpoint": DEFAULT_ENDPOINT, "key": "k"},
+        {"enabled": "off", "endpoint": DEFAULT_ENDPOINT, "key": "k"},
+        {"enabled": 1, "endpoint": DEFAULT_ENDPOINT, "key": "k"},
+        {"enabled": None, "endpoint": DEFAULT_ENDPOINT, "key": "k"},
         {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": ""},
         {"enabled": True, "endpoint": DEFAULT_ENDPOINT, "key": None},
     ):

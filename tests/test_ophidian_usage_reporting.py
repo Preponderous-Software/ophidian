@@ -159,6 +159,9 @@ def test_first_run_under_an_environment_opt_out_says_reporting_is_off(
     out = capsys.readouterr().out
     assert FIRST_RUN_NOTICE not in out
     assert out.count(FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT) == 1
-    # the environment never rewrites the save: the block is still the default
+    # the first run records the environment's opt-out, so a later start
+    # without the variable does not quietly report
     with open(os.path.join(tmp_path, "save.json")) as f:
-        assert json.load(f)["usageReporting"] == defaultUsageReportingSettings()
+        assert json.load(f)["usageReporting"] == defaultUsageReportingSettings(
+            enabled=False
+        )
