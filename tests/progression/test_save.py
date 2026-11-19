@@ -432,3 +432,58 @@ def test_non_object_usage_reporting_reads_as_off(tmp_path, value):
     assert manager.data["usageReporting"] == expected
     # the key was present, so the save is treated as having seen the notice
     assert manager.usageReportingNoticeDue is False
+
+
+NEAR_MISS_OPT_OUTS = [
+    {"usage_reporting": {"enabled": False}},
+    {"usage-reporting": {"enabled": "off"}},
+    {"UsageReporting": {"enabled": "false"}},
+    {"usage_reporting": "off"},
+    {"usageReporting": {"enable": False}},
+    {"usageReporting": {"Enabled": "no"}},
+    {"usageReporting": {"disabled": True}},
+    {"usageReporting": {"enabled": True, "disabled": "yes"}},
+]
+
+
+@pytest.mark.parametrize("fields", NEAR_MISS_OPT_OUTS)
+def test_an_opt_out_written_under_a_near_miss_name_is_an_opt_out(tmp_path, fields):
+    # these used to be ignored, so the default block (on) was saved next to them
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        json.dump(fields, f)
+
+    manager = SaveManager(path)
+
+    assert manager.data["usageReporting"]["enabled"] is False
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"usage_reporting": {"enabled": True}},
+        {"usage-reporting": "on"},
+        {"usageReporting": {"enabled": True, "enable": "yes"}},
+        {"usageReporting": {"enabled": True, "disabled": False}},
+        {"usageReporting": {"enabled": True, "disabled": "no"}},
+    ],
+)
+def test_near_miss_names_that_say_on_are_not_an_opt_out(tmp_path, fields):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        json.dump(fields, f)
+
+    assert SaveManager(path).data["usageReporting"]["enabled"] is True
+
+
+def test_saving_over_a_near_miss_opt_out_writes_the_real_switch_off(tmp_path):
+    path = os.path.join(tmp_path, "save.json")
+    with open(path, "w") as f:
+        json.dump({"usage-reporting": {"enabled": False}}, f)
+
+    SaveManager(path).save()
+
+    with open(path) as f:
+        onDisk = json.load(f)
+    assert onDisk["usageReporting"]["enabled"] is False
+    assert SaveManager(path).data["usageReporting"]["enabled"] is False

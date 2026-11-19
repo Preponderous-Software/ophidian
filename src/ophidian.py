@@ -321,7 +321,7 @@ class Ophidian:
         which the client checks first.
         """
         if self.saveManager.usageReportingNoticeDue:
-            print(firstRunNotice())
+            print(firstRunNotice(self.saveManager.data.get("usageReporting")))
             self.saveManager.save()
         reporter = createUsageReporter(self.saveManager.data.get("usageReporting"))
         reporter.report("startup")

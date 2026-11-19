@@ -1,7 +1,8 @@
 import os
+import re
 import sys
 
-from lib.trace_client import TraceClient, environment_opts_out
+from lib.trace_client import TraceClient, allows_reporting, environment_opts_out
 
 # @author Daniel McCoy Stephenson
 # @since September 11th, 2026
@@ -50,6 +51,16 @@ FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT = (
 )
 
 
+# What the first run says instead when save.json already turns reporting off
+# under another spelling (see hasNearMissOptOut): SaveManager records
+# "enabled": false in the real block, so it stays off.
+FIRST_RUN_NOTICE_OFF_BY_SAVE = (
+    "Usage reporting is off (save.json), and "
+    '"usageReporting": {"enabled": false} is saved in save.json so it stays '
+    "off. Details: " + DETAILS_URL
+)
+
+
 # What the first run says in the browser build, which never reports.
 FIRST_RUN_NOTICE_OFF_IN_BROWSER = (
     "Usage reporting is off in the browser build. Details: " + DETAILS_URL
@@ -63,15 +74,55 @@ def runningInBrowser():
     return sys.platform == "emscripten"
 
 
-def firstRunNotice():
+def firstRunNotice(settings=None):
     """The line the first run prints: FIRST_RUN_NOTICE, unless the
-    environment has already opted out of usage reporting, or this is the
+    environment has already opted out of usage reporting, the save's
+    usageReporting block (``settings``) already says off, or this is the
     browser build, which never reports."""
     if runningInBrowser():
         return FIRST_RUN_NOTICE_OFF_IN_BROWSER
     if environment_opts_out():
         return FIRST_RUN_NOTICE_OFF_BY_ENVIRONMENT
+    if isinstance(settings, dict) and settings.get("enabled", True) is not True:
+        return FIRST_RUN_NOTICE_OFF_BY_SAVE
     return FIRST_RUN_NOTICE
+
+
+def _normaliseKey(key):
+    return re.sub(r"[^a-z0-9]", "", str(key).lower())
+
+
+def hasNearMissOptOut(saveData, settingsKey="usageReporting", switchKey="enabled"):
+    """Whether ``saveData`` holds an attempt to turn usage reporting off that
+    is not written exactly as ``usageReporting`` -> ``enabled``. Such a
+    setting would not be recognised, the default block (``enabled: true``)
+    would be saved next to it, and reporting would stay on. A player who
+    wrote any of these did not ask for reporting, so each counts as off:
+
+    - a top-level key that spells "usage reporting" another way
+      (``usage_reporting``, ``usage-reporting``, ``UsageReporting``, ...)
+      holding a value, or an ``enabled``-like key, that is not clearly on;
+    - ``"usageReporting": "off"`` -- a value instead of a block;
+    - inside any such block, a key that spells "enabled" another way
+      (``enable``, ``Enabled``, ...) that is not clearly on, or one that
+      spells "disabled" whose value is on.
+    """
+    for key, value in saveData.items():
+        if "usagereport" not in _normaliseKey(key):
+            continue
+        if not isinstance(value, dict):
+            if not allows_reporting(value):
+                return True
+            continue
+        for child, childValue in value.items():
+            if key == settingsKey and child == switchKey:
+                continue  # the switch itself, read by the caller
+            name = _normaliseKey(child)
+            if "disabl" in name and allows_reporting(childValue):
+                return True
+            if "enabl" in name and not allows_reporting(childValue):
+                return True
+    return False
 
 
 def defaultUsageReportingSettings(enabled=True):

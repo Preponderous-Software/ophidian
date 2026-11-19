@@ -250,7 +250,10 @@ block to `save.json` (created next to where the game is run):
 To turn it off, any one of these is enough:
 
 - set `"enabled": false` in that block of `save.json` (a `usageReporting` value that is not
-  an object, such as `"usageReporting": false`, is also read as off)
+  an object, such as `"usageReporting": false`, is also read as off; so is an opt-out
+  written under another spelling: a `usage_reporting`, `usage-reporting` or
+  `UsageReporting` block, an `enable`/`Enabled` switch that is not clearly on, or
+  `"disabled": true` - the next save writes `"enabled": false` in the real block)
 - set the environment variable `TRACE_USAGE_REPORTING=off`, which turns off every program
   that reports to trace (any value other than blank, `true`, `on`, `yes` or `1` turns it off)
 - set the environment variable `DO_NOT_TRACK=1` (any value other than blank, `0`, `false`,
