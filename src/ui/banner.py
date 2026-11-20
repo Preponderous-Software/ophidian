@@ -22,6 +22,14 @@ class UiBanner:
     def push(self, message):
         self.queue.append(message)
 
+    def pushNow(self, message):
+        """Shows `message` straight away, ahead of anything queued, for a
+        reply to a key press: queued behind a story line it would arrive
+        seconds after the press. The interrupted message is kept and shows
+        again afterwards."""
+        self.queue.insert(0, message)
+        self.expiresAt = None
+
     def current(self):
         """Returns the message that should currently be shown, or None.
 

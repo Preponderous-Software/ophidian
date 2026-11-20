@@ -40,10 +40,25 @@ pip install -r requirements-dev.txt
 
 ## Usage
 
-### Graphical UI (Default)
-Run the game with the standard pygame graphical interface:
+### 3D window (default on Linux and Windows)
+On Linux and Windows, the game opens in a 3D window drawn with
+[Strata](https://github.com/Preponderous-Software/strata):
 ```bash
+pip install "strata-engine @ git+https://github.com/Preponderous-Software/strata@v0.8.0#subdirectory=bindings/python"
 python3 src/ophidian.py
+```
+The first start downloads Strata's library for your system (checked against a
+pinned SHA-256). If the 3D window can't start (the package isn't installed, no
+graphics driver, macOS), the game says why and opens the 2D window instead.
+`--strata` insists on 3D and stops with the reason instead. Every feature works
+in both windows and in the text UI: the shop, pause, skins, restart, the
+obituary screen and the rest. The snake glides between cells in 3D;
+`--reduced-motion` moves it a cell at a time instead.
+
+### Graphical UI (2D)
+Run the game in the classic pygame window:
+```bash
+python3 src/ophidian.py --2d
 ```
 
 ### Text-Based UI
@@ -190,13 +205,13 @@ a / ← | move left
 s / ↓ | move down
 d / → | move right
 space | pause / resume
-f11 | fullscreen (graphical UI only)
+f11 | fullscreen (2D and 3D windows; 3D needs a Strata release with fullscreen support)
 l | toggle tick speed limit
 c | cycle selected cosmetic skin
 p | open the upgrade shop
 r | restart
 q | quit
-swipe / tap | steer: a swipe turns the way it travelled, a tap turns towards where it landed (graphical UI, mouse or touch)
+swipe / tap | steer: a swipe turns the way it travelled, a tap turns towards where it landed (2D and 3D windows, mouse or touch)
 
 Letter keys are matched regardless of case in either UI, so the controls keep working
 with Caps Lock on.
