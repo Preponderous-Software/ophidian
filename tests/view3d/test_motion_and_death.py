@@ -263,3 +263,84 @@ def test_the_obituary_screen_wraps_long_lines_to_the_window():
     assert texts[0].startswith("Apep") and "hubris." in texts[-2]
     assert all(len(text) * scene.OBITUARY_TEXT_SIZE <= 500 for text in texts)
     assert panels[0].width == 500 and panels[0].height == 700
+
+
+def test_closing_the_window_on_a_death_records_only_the_run_that_died(monkeypatch):
+    import builtins
+    import strata_view.game as gameModule
+
+    class Event:
+        type = "quit"
+
+    class Window:
+        isWindow = True
+        width, height = 900, 700
+
+        class strata:
+            EVENT_QUIT = "quit"
+
+        def __init__(self):
+            self.events = [Event()]
+
+        def pollEvents(self):
+            events, self.events = self.events, []
+            return events
+
+    game, _ = makeGame()
+    game.renderer = Window()
+    monkeypatch.setattr(game, "renderFrame", lambda present=True, now=None: None)
+    monkeypatch.setattr(gameModule.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(gameModule, "OBITUARY_SCREEN_SECONDS", 0.0)
+    monkeypatch.setattr(builtins, "quit", lambda: None)
+    recorded = []
+    record = game.recordCurrentRun
+    monkeypatch.setattr(
+        game,
+        "recordCurrentRun",
+        lambda cause, **kwargs: recorded.append(cause) or record(cause, **kwargs),
+    )
+    head = blockTheWayAhead(game)
+    game.moveEntity(head, head.getDirection())  # the close arrives mid-hold
+    assert not game.running
+    game.quitApplication()
+    assert recorded == ["collision"]  # not a "quit" for the unplayed new run
+
+
+def test_the_hud_has_the_2d_windows_level_progress_bar():
+    game, _ = makeGame()
+    cells = len(game.environment.grid.getLocations())
+    required = game.config.levelProgressPercentageRequired
+    width, height = 900, 700
+    for count, color in (
+        (1, scene.PROGRESS_RED),
+        (int(cells * required * 0.75), scene.PROGRESS_YELLOW),
+        (cells, scene.PROGRESS_GREEN),
+    ):
+        game.snakeParts = [game.selectedSnakePart] * count
+        labels, panels = scene.hudOverlay(game, width, height)
+        backdrop, fill = [
+            p for p in panels if p.y == height - scene.PROGRESS_BAR_HEIGHT
+        ]
+        assert backdrop.width == width
+        assert fill.width == pytest.approx(width * min(1.0, count / cells))
+        assert fill.color == color
+        text = "Progress {}%/{}%".format(int(count / cells * 100), int(required * 100))
+        assert text in [label.text for label in labels]
+
+
+def test_the_story_banner_is_wrapped_to_the_window_rather_than_cut():
+    game, _ = makeGame()
+    game.strataBanner = (
+        "Apep enters The Sunken Grove. Mossy roots coil around still, black water."
+    )
+    labels, _ = scene.hudOverlay(game, 500, 700)
+    lines = [  # the banner sits along the bottom; the HUD's lines along the top
+        l.text for l in labels if l.pixelSize == scene.BANNER_SIZE and l.y > 350
+    ]
+    assert len(lines) > 1
+    assert " ".join(lines) == game.strataBanner
+    assert all(len(line) * scene.BANNER_SIZE <= 500 for line in lines)
+    # above the controls line, which sits above the progress bar
+    hint = [l for l in labels if l.text.startswith("Arrows")][0]
+    assert max(l.y for l in labels if l.text in lines) < hint.y
+    assert hint.y < 700 - scene.PROGRESS_BAR_HEIGHT

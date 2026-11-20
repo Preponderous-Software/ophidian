@@ -71,6 +71,16 @@ OBITUARY_BACKDROP = (0.02, 0.02, 0.03, 0.94)
 # The line the game prints when a run dies (Ophidian.moveEntity); the 3D
 # window shows it over the red board.
 COLLISION_CAPTION = "The ophidian collides with itself and ceases to be."
+# The level-progress bar along the bottom, as in the 2D window (20 pixels
+# there): red below half the share that ends the level, yellow below it,
+# green once it's reached.
+PROGRESS_BAR_HEIGHT = 16
+PROGRESS_BACKDROP = (0.0, 0.0, 0.0, 0.85)
+PROGRESS_RED = (1.0, 0.0, 0.0, 0.9)
+PROGRESS_YELLOW = (1.0, 1.0, 0.0, 0.9)
+PROGRESS_GREEN = (0.0, 1.0, 0.0, 0.9)
+BANNER_SIZE = 18
+BANNER_LINE_HEIGHT = 24
 
 
 # The scene description and the board/piece helpers are graphik's 3D grid
@@ -394,6 +404,50 @@ def obituaryScreenOverlay(lines, footer, width, height):
     return labels, [Panel(0, 0, width, height, OBITUARY_BACKDROP)]
 
 
+def levelProgress(game):
+    """(share of the board the snake fills, share that ends the level), as
+    the 2D window's progress bar and the text UI's "Progress" line read it."""
+    cells = len(game.environment.grid.getLocations())
+    return len(game.snakeParts) / cells, game.config.levelProgressPercentageRequired
+
+
+def progressColor(fraction, required):
+    """The 2D progress bar's colour rule (Ophidian.runPygameFrames)."""
+    if fraction < required / 2:
+        return PROGRESS_RED
+    if fraction < required:
+        return PROGRESS_YELLOW
+    return PROGRESS_GREEN
+
+
+def progressOverlay(game, width, height):
+    """The level-progress bar across the bottom of the window, as in 2D.
+    The share itself is written at the top right (progressText), as the
+    text UI prints it, where it reads on any bar colour."""
+    fraction, required = levelProgress(game)
+    top = height - PROGRESS_BAR_HEIGHT
+    panels = [Panel(0, top, width, PROGRESS_BAR_HEIGHT, PROGRESS_BACKDROP)]
+    filled = width * max(0.0, min(1.0, fraction))
+    if filled > 0:
+        panels.append(
+            Panel(
+                0, top, filled, PROGRESS_BAR_HEIGHT, progressColor(fraction, required)
+            )
+        )
+    return [], panels
+
+
+def progressText(game):
+    fraction, required = levelProgress(game)
+    return "Progress {}%/{}%".format(int(fraction * 100), int(round(required * 100)))
+
+
+def bannerLines(banner, width):
+    """The story banner, word-wrapped to the window rather than cut, so the
+    whole line can be read (the 2D banner shows it whole too)."""
+    return wrapToWindow([banner], width, BANNER_SIZE, margin=18)
+
+
 def hudOverlay(game, width, height):
     """Screen text, and the panels behind it, for the game's current state."""
     screen = getattr(game, "strataObituaryScreen", None)
@@ -417,6 +471,12 @@ def hudOverlay(game, width, height):
             DIM_TEXT_COLOR,
         ),
     ]
+    # the share of the board filled, beside the score: the number the
+    # progress bar along the bottom draws, as the text UI prints it
+    progress = progressText(game)
+    labels.append(
+        Label(progress, width - 18 - 18 * len(progress), 22, 18, DIM_TEXT_COLOR)
+    )
     # The same readout the 2D and text HUDs keep on screen: owned upgrades
     # in play, then each running power-up with its seconds and a meter.
     lineY = 78
@@ -444,24 +504,37 @@ def hudOverlay(game, width, height):
             )
         )
         lineY += 22
-    panels = []
+    progressLabels, panels = progressOverlay(game, width, height)
+    labels += progressLabels
+    # what sits above the progress bar, from the bottom up: the controls
+    # line, then the story banner
+    bottom = height - PROGRESS_BAR_HEIGHT - 6
     showControls = game.paused or game.tick < CONTROLS_HINT_TICKS
     if showControls:
+        bottom -= 20
         labels.append(
             Label(
                 fitText(STRATA_CONTROLS_HINT, width, CONTROLS_HINT_SIZE),
                 18,
-                height - 26,
+                bottom,
                 CONTROLS_HINT_SIZE,
                 DIM_TEXT_COLOR,
             )
         )
     banner = getattr(game, "strataBanner", None)
     if banner:
-        bannerY = height - 58 if showControls else height - 40
-        labels.append(
-            Label(fitText(banner, width, 18), 18, bannerY, 18, DIM_TEXT_COLOR)
-        )
+        lines = bannerLines(banner, width)
+        top = bottom - 8 - BANNER_LINE_HEIGHT * len(lines)
+        for index, line in enumerate(lines):
+            labels.append(
+                Label(
+                    line,
+                    18,
+                    top + BANNER_LINE_HEIGHT * index,
+                    BANNER_SIZE,
+                    DIM_TEXT_COLOR,
+                )
+            )
     if game.paused:
         text = "Paused (space to resume)"
         panels.append(

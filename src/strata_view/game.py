@@ -97,6 +97,8 @@ class StrataOphidian(Ophidian):
         self.strataOverlayLines = None
         # (lines, footer) while the obituary screen is up (renderObituaryScreen)
         self.strataObituaryScreen = None
+        # the window was closed while a death was on screen (holdWindow)
+        self.strataClosedOnDeath = False
         self.strataFrameMs = []
         # slides pieces between ticks; reducedMotion puts them straight on
         # their cells instead
@@ -217,6 +219,10 @@ class StrataOphidian(Ophidian):
         while time.monotonic() < until and (self.running or not whileRunning):
             for event in self.renderer.pollEvents():
                 if event.type == self.renderer.strata.EVENT_QUIT:
+                    if self.collision:
+                        # the run on screen is already recorded; see
+                        # quitApplication
+                        self.strataClosedOnDeath = True
                     if not self.running:
                         return  # closing again while it closes: go now
                     self.running = False
@@ -297,6 +303,15 @@ class StrataOphidian(Ophidian):
         if self.strataShopOpenedAt is not None:
             self.restorePowerUpTimeSpentAway(self.strataShopOpenedAt)
         self.strataShopOpenedAt = None
+
+    def quitApplication(self):
+        """Leaving, as in the base game, except after the window was closed
+        on a death: that run was recorded when it died, and the new run
+        started behind the death screens was never played, so nothing more
+        is recorded and no second obituary is shown."""
+        if self.strataClosedOnDeath:
+            self.collision = True  # the base skips recording a run then
+        super().quitApplication()
 
     # -- the window loop
 
