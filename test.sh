@@ -10,13 +10,13 @@ resolvePython() {
     fi
     for candidate in python3 python; do
         if command -v "$candidate" > /dev/null 2>&1 &&
-            "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 8))' \
+            "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 9))' \
                 > /dev/null 2>&1; then
             PYTHON="$candidate"
             return
         fi
     done
-    echo "No Python 3.8 or newer interpreter found. Install one, or set PYTHON to the path of one."
+    echo "No Python 3.9 or newer interpreter found. Install one, or set PYTHON to the path of one."
     exit 1
 }
 
