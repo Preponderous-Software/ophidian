@@ -27,6 +27,15 @@ jobs:
       - name: Install pygbag
         run: pip install pygbag==0.9.3
 
+      # pygbag packs only what is under src/, so a pip-installed graphik would
+      # be missing in the browser. Install the exact line requirements.txt pins
+      # into src/ for this build only (it is never committed).
+      - name: Put graphik into src for the web build
+        run: |
+          GRAPHIK="$(grep -E '^graphik @ ' requirements.txt)"
+          python -m pip install --no-deps --target src "$GRAPHIK"
+          rm -rf src/*.dist-info
+
       - name: Build with pygbag
         run: python -m pygbag --build --title Ophidian src
 

@@ -111,7 +111,7 @@ class Ophidian:
             import pygame
 
             self.pygame = pygame
-            from lib.graphik.src.graphik import Graphik
+            from preponderous.graphik import Graphik
 
             pygame.init()
             self.initializeGameDisplay()

@@ -2,7 +2,7 @@
 # installed, so there is no [project]/[build-system] table here.
 
 [tool.black]
-# src/lib holds vendored copies of graphik, py_env_lib and trace_client, and
+# src/lib holds vendored copies of py_env_lib and trace_client, and
 # tests/lib holds trace_client's own test. Reformatting them makes re-vendoring
 # an upstream copy a merge conflict for no benefit, so they are excluded here
 # rather than in format.sh's arguments - that way an editor integration or a
