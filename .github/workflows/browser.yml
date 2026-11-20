@@ -40,10 +40,12 @@ jobs:
           python -m pip install --no-deps --target src "$GRAPHIK"
           rm -rf src/*.dist-info
 
-      # graphik's pygbag template is pygbag 0.9.3's default page plus a 3D
-      # toggle and the Strata grid relay's canvas and loader scripts. The 2D
-      # game plays exactly as before until the toggle is pressed; nothing of
-      # the 3D view is downloaded until then.
+      # graphik's pygbag template is pygbag 0.9.3's default page plus a 2D/3D
+      # button and the Strata grid relay's canvas. It starts in 3D (the
+      # template's default, as on the desktop), loading the relay alongside
+      # the game, and falls back to 2D with the reason if 3D can't start; a
+      # player's choice of 2D is remembered, and ?view=2d starts in 2D
+      # without downloading anything of the 3D view.
       - name: Build with pygbag
         run: |
           TEMPLATE="$(PYTHONPATH=src python -c 'from preponderous.graphik.grid3d.web import templatePath; print(templatePath())')"

@@ -8,6 +8,7 @@ as screen-space labels and panels over the board. Only the drawing differs.
 
 from preponderous.graphik.grid3d import centredLabel, wrapText
 from progression.shop import listUpgrades, purchaseUpgrade
+from strata_view.scene import BUTTON_GAP, overlapsArea
 
 # SDL scancodes the shop answers to, matching PygameShopScreen's keys.
 SHOP_UP = {82, 26}  # Up, W
@@ -16,6 +17,7 @@ SHOP_BUY = {40, 88, 44}  # Enter, keypad Enter, Space
 SHOP_CLOSE = {41, 19}  # Escape, P
 
 SHOP_HINT = "W/S or Up/Down: navigate   Enter: purchase   Esc/P: close"
+SHOP_TITLE = "Ophidian Shop"
 
 TITLE_COLOR = (1.0, 1.0, 1.0, 1.0)
 CURRENCY_COLOR = (1.0, 0.86, 0.25, 1.0)
@@ -67,8 +69,10 @@ class StrataShop:
             return False
         return True
 
-    def overlay(self, width, height, Label, Panel, fitText):
-        """Labels and panels for the shop, in the 2D shop's layout."""
+    def overlay(self, width, height, Label, Panel, fitText, keepClear=None):
+        """Labels and panels for the shop, in the 2D shop's layout. The
+        title moves down below `keepClear` ((x, y, width, height): the
+        browser page's 2D/3D button) when it would run under it."""
         data = self.saveManager.data
         owned = data.get("purchasedUpgrades", [])
         panels = [Panel(0, 0, width, height, BACKDROP_COLOR)]
@@ -88,8 +92,18 @@ class StrataShop:
                 )
             return (len(lines) - 1) * (size + 6)
 
-        y = 22 + centred("Ophidian Shop", 22, 28, TITLE_COLOR, smallest=18)
-        y = 60 + y - 22
+        titleY = 22
+        titleSize, titleLines = setText(SHOP_TITLE, room, 28, 18)
+        titleWidth = titleSize * max(len(line) for line in titleLines)
+        if keepClear is not None and overlapsArea(
+            width / 2 - titleWidth / 2,
+            titleY,
+            titleWidth,
+            len(titleLines) * (titleSize + 6),
+            keepClear,
+        ):
+            titleY = keepClear[1] + keepClear[3] + BUTTON_GAP
+        y = titleY + 38 + centred(SHOP_TITLE, titleY, 28, TITLE_COLOR, smallest=18)
         y += centred(
             "Currency: {}".format(data.get("currency", 0)), y, 18, CURRENCY_COLOR
         )

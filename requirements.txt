@@ -4,7 +4,7 @@
 pygame>=2.0.0
 # graphik draws the pygame screens. Installed from its release tag's archive (it
 # isn't on PyPI); the browser build installs the same line into src/ (browser.yml).
-graphik @ https://github.com/Stephenson-Software/graphik/archive/refs/tags/v0.5.0.zip
+graphik @ https://github.com/Stephenson-Software/graphik/archive/refs/tags/v0.5.1.zip
 # Strata draws the 3D window (Linux and Windows only; other systems open the
 # 2D window). The browser build installs only the graphik line above.
 strata-engine @ git+https://github.com/Preponderous-Software/strata@v0.8.0#subdirectory=bindings/python ; sys_platform == "linux" or sys_platform == "win32"
