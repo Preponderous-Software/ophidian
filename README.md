@@ -31,7 +31,7 @@ page is built with graphik's pygbag template, and the build puts Strata's
 prebuilt grid relay, which draws the 3D view, next to it (see `browser.yml`).
 
 ## Requirements
-- Python 3.8 or newer (developed and tested on 3.10)
+- Python 3.9 or newer (developed and tested on 3.10); the graphik release in `requirements.txt` needs 3.9
 - [pygame](https://www.pygame.org/) and [graphik](https://github.com/Stephenson-Software/graphik) — only for the graphical UI; `--text-ui` runs without them
 
 ## Installation
@@ -81,7 +81,7 @@ the tests. It sends the game's console output to `output.txt` rather than the
 terminal, so the first-run usage reporting notice and the console copy of each
 obituary and its chronicle end up in that file. `./run.sh` and `./test.sh` pick
 the interpreter themselves — `python3` first, then `python`, taking whichever
-reports 3.8 or newer — so set `PYTHON` to override that choice:
+reports 3.9 or newer — so set `PYTHON` to override that choice:
 ```bash
 PYTHON=.venv/bin/python ./test.sh
 ```

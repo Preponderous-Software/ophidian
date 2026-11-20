@@ -33,6 +33,11 @@ requiresBash = pytest.mark.skipif(BASH is None, reason="bash is not installed")
 SCRIPTS = ["test.sh", "run.sh", "format.sh"]
 PYTHON_CALLING_SCRIPTS = ["test.sh", "run.sh"]
 
+# the `requires-python` each graphik release declares in its pyproject.toml.
+# Both scripts need graphik - test.sh's suite imports it, and run.sh starts
+# the graphical UI - so README's minimum can't sit below it (issue #207).
+GRAPHIK_REQUIRES_PYTHON = {"v0.5.0": (3, 9)}
+
 
 def _read(name):
     with open(os.path.join(REPO_ROOT, name)) as handle:
@@ -51,6 +56,10 @@ def _documentedMinimumVersion():
     documented = re.search(r"Python (\d+)\.(\d+) or newer", _read("README.md"))
     assert documented is not None, "README no longer states a minimum Python version"
     return tuple(int(part) for part in documented.groups())
+
+
+def _missingInterpreterMessage():
+    return "No Python %d.%d or newer interpreter found." % _documentedMinimumVersion()
 
 
 def _writeExecutable(path, body):
@@ -156,7 +165,7 @@ def test_a_python_2_fallback_is_taken_only_when_it_qualifies(script, tmp_path):
     resolved = _runResolver(tmp_path, script, {"python": (2, 7, 18)})
 
     assert resolved.returncode == 1
-    assert "No Python 3.8 or newer interpreter found." in resolved.stdout
+    assert _missingInterpreterMessage() in resolved.stdout
 
 
 @requiresBash
@@ -182,6 +191,20 @@ def test_the_documented_minimum_version_is_the_one_enforced(script, tmp_path):
     assert accepted.stdout.strip() == "python3"
 
 
+def test_the_documented_minimum_is_one_the_pinned_graphik_installs_on():
+    pinned = re.search(
+        r"graphik/archive/refs/tags/(v[\d.]+)\.zip", _read("requirements.txt")
+    )
+    assert pinned is not None, "requirements.txt no longer pins a graphik release"
+    tag = pinned.group(1)
+    assert tag in GRAPHIK_REQUIRES_PYTHON, (
+        "graphik %s is pinned now: add its requires-python to "
+        "GRAPHIK_REQUIRES_PYTHON, and raise README's minimum if it went up" % tag
+    )
+
+    assert _documentedMinimumVersion() >= GRAPHIK_REQUIRES_PYTHON[tag]
+
+
 @requiresBash
 @pytest.mark.parametrize("script", PYTHON_CALLING_SCRIPTS)
 def test_a_preset_python_is_honored_without_probing(script, tmp_path):
@@ -199,5 +222,5 @@ def test_no_candidate_at_all_fails_with_an_actionable_message(script, tmp_path):
     resolved = _runResolver(tmp_path, script, {})
 
     assert resolved.returncode == 1
-    assert "No Python 3.8 or newer interpreter found." in resolved.stdout
+    assert _missingInterpreterMessage() in resolved.stdout
     assert "set PYTHON" in resolved.stdout
