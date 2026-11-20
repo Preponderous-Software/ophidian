@@ -44,7 +44,7 @@ pip install -r requirements-dev.txt
 On Linux and Windows, the game opens in a 3D window drawn with
 [Strata](https://github.com/Preponderous-Software/strata):
 ```bash
-pip install "strata-engine @ git+https://github.com/Preponderous-Software/strata@v0.7.0#subdirectory=bindings/python"
+pip install "strata-engine @ git+https://github.com/Preponderous-Software/strata@v0.8.0#subdirectory=bindings/python"
 python3 src/ophidian.py
 ```
 The first start downloads Strata's library for your system (checked against a
