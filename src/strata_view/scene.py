@@ -85,6 +85,8 @@ BANNER_LINE_HEIGHT = 24
 # row of its own and wraps the controls line, rather than cutting text off.
 NARROW_WIDTH = 560
 SMALLEST_TEXT = 9
+# how far HUD text keeps from the browser page's 2D/3D button
+BUTTON_GAP = 8
 
 
 # The scene description and the board/piece helpers are graphik's 3D grid
@@ -348,20 +350,22 @@ def wrapToWindow(lines, width, pixelSize, margin=40):
     return wrapText(list(lines), max(pixelSize * 4, width - 2 * margin), pixelSize)
 
 
-def obituaryScreenOverlay(lines, footer, width, height):
+def obituaryScreenOverlay(lines, footer, width, height, keepClear=None):
     """The 3D obituary screen: the same lines as the 2D one (the obituary,
     then the lifetime chronicle), wrapped and centred on a dark backdrop
-    over the whole window, and a footer saying what happens next."""
+    over the whole window, and a footer saying what happens next. The
+    lines stay below `keepClear` (the page's 2D/3D button), if given."""
     size, step = OBITUARY_TEXT_SIZE, OBITUARY_LINE_HEIGHT
+    inset = keepClear[1] + keepClear[3] + BUTTON_GAP if keepClear else 0
     wrapped = wrapToWindow(lines, width, size)
     # the footer wraps too (a phone is narrower than the line)
     footerLines = wrapToWindow([footer], width, size) if footer else [""]
-    room = max(1, int((height - (2 + len(footerLines)) * step) / step))
+    room = max(1, int((height - inset - (2 + len(footerLines)) * step) / step))
     if len(wrapped) > room:
         wrapped = wrapped[: room - 1] + ["..."]
     footerLines = footerLines if footer else []
     shown = wrapped + ([""] + footerLines if footer else [])
-    top = height / 2 - len(shown) * step / 2
+    top = max(inset, height / 2 - len(shown) * step / 2)
     labels = []
     for index, line in enumerate(shown):
         if not line:
@@ -446,32 +450,61 @@ def obituaryScreenLines(game):
     return lines, footer
 
 
+def overlapsArea(x, y, textWidth, textHeight, area, gap=BUTTON_GAP):
+    """True when a box of text at (x, y) comes within `gap` of `area`
+    ((x, y, width, height), the page's 2D/3D button), or never for None."""
+    if area is None:
+        return False
+    ax, ay, aw, ah = area
+    return (
+        x < ax + aw + gap
+        and x + textWidth > ax - gap
+        and y < ay + ah + gap
+        and y + textHeight > ay - gap
+    )
+
+
+def sizeBeside(text, x, y, pixelSize, area, smallest=SMALLEST_TEXT):
+    """The pixel size, up to `pixelSize`, at which a line at (x, y) ends
+    before `area` (the page's button), if it would otherwise run under it."""
+    if not overlapsArea(x, y, pixelSize * len(text), pixelSize, area):
+        return pixelSize
+    room = area[0] - BUTTON_GAP - x
+    return max(smallest, min(pixelSize, int(room / max(1, len(text)))))
+
+
 def hudOverlay(game, width, height):
     """Screen text, and the panels behind it, for the game's current state.
 
     A game may set `strataControlsHint` to its own controls line (the
-    browser's names swipes and taps and has no quit key)."""
+    browser's names swipes and taps and has no quit key), and
+    `strataKeepClear` to the area (x, y, width, height) of a button over the
+    view (the browser page's 2D/3D button), which the text then stays out
+    from under."""
+    keepClear = getattr(game, "strataKeepClear", None)
     screen = getattr(game, "strataObituaryScreen", None)
     if screen is not None:
         # replaces the HUD, as the 2D obituary screen replaces the board
         lines, footer = screen
-        return obituaryScreenOverlay(lines, footer, width, height)
+        return obituaryScreenOverlay(lines, footer, width, height, keepClear)
     shop = getattr(game, "strataShop", None)
     if shop is not None:
         # The shop replaces the HUD: Strata draws every panel before any
         # text, so HUD text would otherwise show through the shop's backdrop.
-        return shop.overlay(width, height, Label, Panel, fitText)
+        return shop.overlay(width, height, Label, Panel, fitText, keepClear)
     narrow = width < NARROW_WIDTH
     currency = game.saveManager.data.get("currency", 0)
     stats = f"Level {game.level}  Length {len(game.snakeParts)}  Currency {currency}"
     score = game.getScoreLabel()
+    scoreSize = fitSize(score, width, 26) if narrow else 26
+    statsSize = fitSize(stats, width, 18) if narrow else 18
     labels = [
-        Label(score, 18, 16, fitSize(score, width, 26) if narrow else 26),
+        Label(score, 18, 16, sizeBeside(score, 18, 16, scoreSize, keepClear)),
         Label(
             stats,
             18,
             50,
-            fitSize(stats, width, 18) if narrow else 18,
+            sizeBeside(stats, 18, 50, statsSize, keepClear),
             DIM_TEXT_COLOR,
         ),
     ]
@@ -484,8 +517,14 @@ def hudOverlay(game, width, height):
         labels.append(Label(progress, 18, lineY, 14, DIM_TEXT_COLOR))
         lineY += 22
     else:
+        # its right edge at the window's margin, or left of the button
+        right = width - 18
+        if overlapsArea(
+            right - 18 * len(progress), 22, 18 * len(progress), 18, keepClear
+        ):
+            right = keepClear[0] - BUTTON_GAP
         labels.append(
-            Label(progress, width - 18 - 18 * len(progress), 22, 18, DIM_TEXT_COLOR)
+            Label(progress, right - 18 * len(progress), 22, 18, DIM_TEXT_COLOR)
         )
     # The same readout the 2D and text HUDs keep on screen: owned upgrades
     # in play, then each running power-up with its seconds and a meter.

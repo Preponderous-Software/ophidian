@@ -34,9 +34,10 @@ PHONE = (390, 844)
 class Page:
     """The page around the game: a 3D toggle, a size and a grid relay."""
 
-    def __init__(self, size=PHONE, failOpen=None, relayState="ready"):
+    def __init__(self, size=PHONE, failOpen=None, relayState="ready", button=None):
         self.on = False
         self.size_ = size
+        self.button = button
         self.failOpen = failOpen
         self.relay = grid3dweb.RecordingRelay(state=relayState)
         self.toggles = []
@@ -51,6 +52,9 @@ class Page:
 
     def size(self):
         return self.size_
+
+    def buttonArea(self):
+        return self.button
 
     def openView(self, width, height):
         if self.failOpen:
@@ -576,3 +580,143 @@ def test_main_runs_the_web_game_in_a_browser_and_the_2d_game_elsewhere():
     assert namespace["chooseGame"]("emscripten") is WebOphidian
     assert namespace["chooseGame"]("linux") is Ophidian
     assert importlib.util.find_spec("strata_view.web") is not None
+
+
+# -- the page's 2D/3D button, which the 3D text keeps clear of
+
+# where graphik's template puts the button on a 390-pixel phone (top right)
+PHONE_BUTTON = (326, 8, 56, 36)
+
+
+def underButton(labels, area):
+    return [
+        label.text
+        for label in labels
+        if scene.overlapsArea(
+            label.x,
+            label.y,
+            label.pixelSize * len(label.text),
+            label.pixelSize,
+            area,
+            0,
+        )
+    ]
+
+
+def test_opening_the_view_reads_where_the_button_is(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    page = Page(button=PHONE_BUTTON)
+    game = WebOphidian(page=page)
+    try:
+        page.on = True
+        game.update3D()
+        assert game.strataKeepClear == PHONE_BUTTON
+
+        # a rotated phone: the button moves with the page's right edge
+        page.button = (780, 8, 56, 36)
+        page.relay.events.append(
+            {"type": grid3dweb.EVENT_RESIZED, "width": 844, "height": 390}
+        )
+        game.update3D()
+        assert game.strataKeepClear == (780, 8, 56, 36)
+    finally:
+        pygame.quit()
+
+
+def test_the_shop_title_moves_below_the_button_on_a_phone(game):
+    from preponderous.graphik.grid3d import Label, Panel, fitText
+    from strata_view.shop import SHOP_TITLE, StrataShop
+
+    shop = StrataShop(game.saveManager)
+    shop.message = "Purchased Head Start."
+    labels, _ = shop.overlay(*PHONE, Label, Panel, fitText, PHONE_BUTTON)
+
+    assert underButton(labels, PHONE_BUTTON) == []
+    title = [label for label in labels if label.text == SHOP_TITLE][0]
+    assert title.y >= PHONE_BUTTON[1] + PHONE_BUTTON[3]
+    # the rest still fits the phone, nothing cut
+    for label in labels:
+        assert 0 <= label.x and label.x + label.pixelSize * len(label.text) <= PHONE[0]
+    assert labels[-1].y + labels[-1].pixelSize < PHONE[1]
+
+
+def test_the_shop_keeps_its_layout_where_the_button_is_out_of_the_way(game):
+    from preponderous.graphik.grid3d import Label, Panel, fitText
+    from strata_view.shop import SHOP_TITLE, StrataShop
+
+    shop = StrataShop(game.saveManager)
+    plain, _ = shop.overlay(900, 700, Label, Panel, fitText)
+    beside, _ = shop.overlay(900, 700, Label, Panel, fitText, (836, 8, 56, 36))
+
+    assert [(lb.text, lb.x, lb.y) for lb in plain] == [
+        (lb.text, lb.x, lb.y) for lb in beside
+    ]
+    assert [lb for lb in plain if lb.text == SHOP_TITLE][0].y == 22
+
+
+def test_the_shop_in_the_hud_keeps_clear_of_the_button(game, page):
+    from strata_view.shop import StrataShop
+
+    game.strataKeepClear = PHONE_BUTTON
+    game.strataShop = StrataShop(game.saveManager)
+    labels, _ = scene.hudOverlay(game, *PHONE)
+
+    assert "Ophidian Shop" in [label.text for label in labels]
+    assert underButton(labels, PHONE_BUTTON) == []
+
+
+def test_a_long_score_ends_before_the_button_on_a_phone(game, monkeypatch):
+    monkeypatch.setattr(game, "getScoreLabel", lambda: "12345 (x2 score)")
+    game.strataKeepClear = PHONE_BUTTON
+    labels, _ = scene.hudOverlay(game, *PHONE)
+
+    assert underButton(labels, PHONE_BUTTON) == []
+    assert labels[0].text == "12345 (x2 score)"
+
+
+def test_the_wide_hud_puts_the_progress_share_left_of_the_button(game):
+    button = (836, 8, 56, 36)
+    game.strataKeepClear = button
+    labels, _ = scene.hudOverlay(game, 900, 700)
+    progress = [label for label in labels if label.text.startswith("Progress")][0]
+
+    assert underButton(labels, button) == []
+    assert progress.y == 22 and progress.x > 450
+    assert progress.x + progress.pixelSize * len(progress.text) <= button[0]
+
+
+def test_the_obituary_screen_stays_below_the_button(game):
+    lines = ["The ophidian, a long-lived serpent, ceased to be."] * 60
+    labels, _ = scene.obituaryScreenOverlay(
+        lines, "A new run begins in a moment.", *PHONE, PHONE_BUTTON
+    )
+
+    assert underButton(labels, PHONE_BUTTON) == []
+    assert all(label.y + label.pixelSize <= PHONE[1] for label in labels)
+
+
+def test_without_a_button_the_hud_is_as_before(game):
+    # the desktop 3D window has no page button: nothing moves
+    plain = scene.hudOverlay(game, *PHONE)[0]
+    game.strataKeepClear = None
+    assert [(lb.text, lb.x, lb.y) for lb in scene.hudOverlay(game, *PHONE)[0]] == [
+        (lb.text, lb.x, lb.y) for lb in plain
+    ]
+
+
+def test_a_page_starting_in_3d_gets_the_3d_view_on_the_first_frame(
+    tmp_path, monkeypatch
+):
+    # graphik's page starts in 3D: the toggle is on before the game runs
+    monkeypatch.chdir(tmp_path)
+    page = Page()
+    page.on = True
+    game = WebOphidian(page=page)
+    try:
+        game.update3D()
+        assert game.view3d is not None and page.opened == 1
+        assert {grid3dweb.BOARD, grid3dweb.PIECES, grid3dweb.HUD} <= {
+            kind for kind, _ in (grid3dweb.decode(m) for m in page.relay.messages)
+        }
+    finally:
+        pygame.quit()

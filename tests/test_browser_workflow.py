@@ -52,11 +52,28 @@ def test_the_build_checks_the_page_has_the_3d_toggle_and_the_relay():
 
 def test_the_pinned_graphik_has_the_browser_3d_view():
     # grid3d.web (the relay view, the template and the relay fetcher) came
-    # with graphik 0.5.0
+    # with graphik 0.5.0; 0.5.1's template starts in 3D (remembering a
+    # player's 2D), fetches the relay's scripts only when 3D is wanted, keeps
+    # the page from scrolling (so a phone can't push the 2D/3D button off
+    # screen) and says where the button is (buttonArea)
     version = re.search(
         r"graphik/archive/refs/tags/v(\d+)\.(\d+)\.(\d+)\.zip", REQUIREMENTS
     )
-    assert version and tuple(map(int, version.groups())) >= (0, 5, 0)
+    assert version and tuple(map(int, version.groups())) >= (0, 5, 1)
+
+
+def test_graphiks_template_keeps_the_page_still_and_the_relay_for_later():
+    template = open(grid3dweb.templatePath()).read()
+    assert "html, body { overflow: hidden; }" in template
+    # fetched by the page only when 3D is wanted, so ?view=2d fetches none
+    assert '<script src="grid-relay.js"' not in template
+    assert callable(grid3dweb.buttonArea)
+
+
+def test_the_browser_build_starts_in_3d_as_the_desktop_does():
+    # browser.yml builds with templatePath() as it is: 3D first
+    assert "import templatePath; print(templatePath())" in WORKFLOW
+    assert 'data-default-view="3d"' in open(grid3dweb.templatePath()).read()
 
 
 def test_graphiks_template_carries_the_toggle_and_the_relay_canvas():

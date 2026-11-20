@@ -1,8 +1,9 @@
 """Ophidian's 3D view in the browser (the arcade's pygbag build).
 
 The browser game is the 2D game, Ophidian's async pygame loop, and the
-page's 3D toggle (graphik's pygbag template) only changes how it is shown.
-While the toggle is on, WebOphidian sends what the desktop 3D window draws
+page's 2D/3D button (graphik's pygbag template) only changes how it is
+shown. The page starts in 3D, as the desktop does, unless the player chose
+2D there before (or the address says ?view=2d). While 3D is on, WebOphidian sends what the desktop 3D window draws
 (strata_view.scene: the board, the snake and pickups, the HUD) to the page's
 Strata grid relay through graphik's Grid3DWebView, once a frame of the 2D
 loop. The rules, keys, timers and screens stay the 2D game's own, so the
@@ -21,8 +22,11 @@ control works in 3D:
   red board with the death line, the obituary over the board), for as long
   as the 2D game shows them.
 
-Nothing of the 3D view is downloaded until the player asks for it, and if
-it can't load the 2D view stays and the banner says why.
+If the 3D view can't start, the 2D view stays and the page and the banner
+say why; a page in 2D downloads nothing of the 3D view until it is asked
+for. The 3D HUD, the
+shop and the obituary screen keep their text out from under the page's
+2D/3D button (graphik's buttonArea()).
 """
 
 import asyncio
@@ -58,17 +62,6 @@ class BrowserPage:
     """The page around the game under pygbag: its 3D toggle, its size and
     its grid relay (graphik's grid3d.web)."""
 
-    def __init__(self):
-        # The page never scrolls. Without this a phone's browser widens it
-        # once the 3D canvas shows (to fit pygbag's 50000-pixel-wide
-        # measuring element), which pushes the 2D/3D button off screen.
-        try:
-            document = _platformWindow().document
-            for element in (document.documentElement, document.body):
-                element.style.overflow = "hidden"
-        except Exception as error:  # a page without them: nothing to clip
-            print("Page left as it is:", error)
-
     def wants3D(self):
         return grid3dweb.wants3D()
 
@@ -78,6 +71,11 @@ class BrowserPage:
     def size(self):
         window = _platformWindow()
         return int(window.innerWidth), int(window.innerHeight)
+
+    def buttonArea(self):
+        """Where the page's 2D/3D button is, (x, y, width, height), for the
+        3D HUD to keep its text out from under it."""
+        return grid3dweb.buttonArea()
 
     def openView(self, width, height):
         return grid3dweb.Grid3DWebView.open(
@@ -125,6 +123,8 @@ class WebOphidian(Ophidian):
         self.strataOverlayLines = None
         self.strataObituaryScreen = None
         self.strataControlsHint = WEB_CONTROLS_HINT
+        # the page's 2D/3D button, which the 3D HUD keeps clear of
+        self.strataKeepClear = None
         # the 3D picture of a frame the 2D game is about to hold (holdFrame)
         self.pending3D = None
         super().__init__(**kwargs)
@@ -155,7 +155,14 @@ class WebOphidian(Ophidian):
             self.page.set3D(False, str(reason))
             self.uiBanner.pushNow(unavailableMessage(reason))
             return
+        self.readButtonArea()
         self.forget3D()
+
+    def readButtonArea(self):
+        """Where the page's 2D/3D button is now (read on opening and on a
+        resize, as the page lays it out)."""
+        area = getattr(self.page, "buttonArea", None)
+        self.strataKeepClear = area() if area is not None else None
 
     def close3D(self):
         """Back to the 2D view; if the 3D view failed to load, the banner
@@ -189,6 +196,7 @@ class WebOphidian(Ophidian):
         for event in events:
             if event.type == grid3dweb.EVENT_RESIZED and event.width and event.height:
                 view.resize(event.width, event.height)
+                self.readButtonArea()
                 self.sent3DHud = None
         presses = [
             e

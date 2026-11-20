@@ -3,8 +3,8 @@ its main.py. The desktop game still starts from src/ophidian.py (run.sh);
 both run the same async pygame loop, Ophidian.runPygameUI.
 
 In a browser the game is WebOphidian: the same 2D game, which also draws
-itself in the page's 3D view when the player turns that on (strata_view/
-web.py). Its files are downloaded only then.
+itself in the page's 3D view (strata_view/web.py). The page starts in 3D,
+as the desktop does, unless the player chose 2D (graphik's page template).
 """
 
 import asyncio
@@ -19,8 +19,8 @@ from ophidian import Ophidian
 
 
 def chooseGame(platform=None):
-    """The game class to run: WebOphidian in a browser, so the page's 3D
-    toggle works; Ophidian anywhere else, or when graphik's 3D view isn't
+    """The game class to run: WebOphidian in a browser, so the page's 2D/3D
+    button works; Ophidian anywhere else, or when graphik's 3D view isn't
     in the build (then the toggle is marked unavailable, with the reason)."""
     platform = sys.platform if platform is None else platform
     if platform != "emscripten":
