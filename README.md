@@ -23,7 +23,7 @@ closing the tab ends the game.
 
 ## Requirements
 - Python 3.8 or newer (developed and tested on 3.10)
-- [pygame](https://www.pygame.org/) — only for the graphical UI; `--text-ui` runs without it
+- [pygame](https://www.pygame.org/) and [graphik](https://github.com/Stephenson-Software/graphik) — only for the graphical UI; `--text-ui` runs without them
 
 ## Installation
 ```bash
@@ -282,7 +282,7 @@ Name | Main Contributions
 Daniel Stephenson | Creator
 
 ## Libraries
-This project makes use of [graphik](https://github.com/Preponderous-Software/graphik), [py_env_lib](https://github.com/Preponderous-Software/py_env_lib) and [trace-client-python](https://github.com/Stephenson-Software/trace-client-python), vendored under `src/lib/`.
+This project makes use of [graphik](https://github.com/Stephenson-Software/graphik), installed from a release tag pinned in `requirements.txt`, and of [py_env_lib](https://github.com/Preponderous-Software/py_env_lib) and [trace-client-python](https://github.com/Stephenson-Software/trace-client-python), vendored under `src/lib/`.
 
 ## 📄 License
 

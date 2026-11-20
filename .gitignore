@@ -8,4 +8,6 @@ save.json
 cov.xml
 # pygbag browser build output (see .github/workflows/browser.yml)
 src/build/
+# graphik, installed into src/ only for the browser build (browser.yml)
+src/preponderous/
 web-version.txt
