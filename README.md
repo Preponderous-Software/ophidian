@@ -51,7 +51,9 @@ The first start downloads Strata's library for your system (checked against a
 pinned SHA-256). If the 3D window can't start (the package isn't installed, no
 graphics driver, macOS), the game says why and opens the 2D window instead.
 `--strata` insists on 3D and stops with the reason instead. Every feature works
-in both windows and in the text UI: the shop, pause, skins, restart and the rest.
+in both windows and in the text UI: the shop, pause, skins, restart, the
+obituary screen and the rest. The snake glides between cells in 3D;
+`--reduced-motion` moves it a cell at a time instead.
 
 ### Graphical UI (2D)
 Run the game in the classic pygame window:

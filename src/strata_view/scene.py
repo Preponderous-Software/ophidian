@@ -12,6 +12,7 @@ is centred on the origin.
 """
 
 import math
+
 from controls.keybindings import (
     STRATA_CONTROLS_HINT,
     DIRECTION_DOWN,
@@ -22,6 +23,7 @@ from controls.keybindings import (
 from food.food import Food
 from powerup.powerup import PowerUp
 from snake.snakePart import SnakePart
+from ui.text_wrap import wrapLinesToWidth
 
 # Shape kinds, matching Strata's PRIMITIVE_* values without importing them.
 CUBE, CAPSULE, CYLINDER, SPHERE = 0, 1, 2, 3
@@ -55,6 +57,20 @@ CONTROLS_HINT_TICKS = 60
 # small enough that the whole controls line fits a 900-pixel window
 CONTROLS_HINT_SIZE = 11
 CLEAR_COLOR = (0.10, 0.12, 0.16, 1.0)
+# How far the body fades from the neck to the tip of the tail: a bright
+# segment darkens by this much, a dark one (the Obsidian skin) lightens
+# towards TAIL_LIGHT instead, so the gradient reads on the moss either way.
+TAIL_FADE = 0.38
+TAIL_LIGHT = (0.55, 0.56, 0.60)
+DARK_LUMINANCE = 0.22
+# The 2D window holds its obituary screen this long (Ophidian.renderObituaryScreen).
+OBITUARY_SCREEN_SECONDS = 1.5
+OBITUARY_TEXT_SIZE = 16
+OBITUARY_LINE_HEIGHT = 24
+OBITUARY_BACKDROP = (0.02, 0.02, 0.03, 0.94)
+# The line the game prints when a run dies (Ophidian.moveEntity); the 3D
+# window shows it over the red board.
+COLLISION_CAPTION = "The ophidian collides with itself and ceases to be."
 
 
 # The scene description and the board/piece helpers are graphik's 3D grid
@@ -191,10 +207,35 @@ def boardShapes(columns, rows, collision=False):
     )
 
 
-def snakePieces(cells, direction, color):
+def luminance(color):
+    r, g, b = color[:3]
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def bodyShade(color, fraction):
+    """A body segment's colour `fraction` (0 at the neck, 1 at the tip) of
+    the way down the tail: the segment's own colour, fading so the body reads
+    as running from the head to the tail. Bright colours darken; dark ones
+    (the Obsidian skin) lighten instead, so the tail never sinks into the
+    board."""
+    fraction = max(0.0, min(1.0, fraction))
+    amount = TAIL_FADE * fraction
+    color = tuple(color[:3])
+    if luminance(color) < DARK_LUMINANCE:
+        return tuple(c + (light - c) * amount for c, light in zip(color, TAIL_LIGHT))
+    return shade(color, 1.0 - amount)
+
+
+def snakePieces(cells, direction, color, colors=None):
     """grid3d pieces for a snake whose cells run head first, as grid
     (column, row) pairs: a tapering body, chained so neighbours are bridged,
-    and a brighter head looking the way it moves."""
+    and a brighter head looking the way it moves.
+
+    `color` is the head's colour (the selected skin). `colors`, when given,
+    is each part's own colour, head first, as the 2D window paints them: the
+    body a run starts with wears the skin, and each segment grown since
+    wears the colour of the food that grew it. Either way the body fades
+    from the neck to the tail (bodyShade)."""
     pieces = []
     count = len(cells)
     facing = DIRECTION_STEPS.get(direction, (0, 1))
@@ -204,8 +245,11 @@ def snakePieces(cells, direction, color):
             style, scale, tint = "head", 1.0, headColor
         else:
             style = "body"
-            scale = 1.0 - 0.35 * (index / max(1, count - 1))
-            tint = tuple(color[:3])
+            fraction = index / max(1, count - 1)
+            scale = 1.0 - 0.35 * fraction
+            own = colors[index] if colors is not None else color
+            # the neck in its full colour, the tip of the tail fully faded
+            tint = bodyShade(own, (index - 1) / max(1, count - 2))
         pieces.append(
             Piece(
                 ("snake", index),
@@ -247,8 +291,10 @@ def pickupPiece(entity, column, row):
         style = "food"
     else:
         style = "block"
+    # the entity's own id, not id(): a new pickup must never inherit an
+    # eaten one's id (and slide over from where it stood)
     return Piece(
-        ("entity", id(entity)), column, row, style, color=rgb(entity.getColor())
+        ("entity", entity.getID()), column, row, style, color=rgb(entity.getColor())
     )
 
 
@@ -281,15 +327,21 @@ def snakeCells(game, columns, rows):
 def snakeGridCells(game):
     """Grid (column, row) of each snake part, head first; parts not on the
     board are skipped."""
+    return [cell for cell, _ in snakeGridParts(game)]
+
+
+def snakeGridParts(game):
+    """((column, row), 0-1 colour) of each snake part, head first; parts not
+    on the board are skipped."""
     grid = game.environment.getGrid()
-    cells = []
+    parts = []
     for part in game.snakeParts:
         locationId = part.getLocationID()
         if locationId is None:
             continue
         location = grid.getLocation(locationId)
-        cells.append((location.getX(), location.getY()))
-    return cells
+        parts.append(((location.getX(), location.getY()), rgb(part.getColor())))
+    return parts
 
 
 def fitText(text, width, pixelSize, margin=18):
@@ -307,8 +359,48 @@ def durationMeter(fractionRemaining, cells=10):
     return "[" + "#" * filled + "-" * (cells - filled) + "]"
 
 
+def wrapToWindow(lines, width, pixelSize, margin=40):
+    """Word-wrap lines to the window, as the 2D obituary screen does (issue
+    #139: a cut line lost the ophidian's name or its cause of death).
+    Strata's font is monospaced, about one pixel size per character."""
+    return wrapLinesToWidth(
+        lines,
+        lambda text: len(text) * pixelSize,
+        max(pixelSize * 4, width - 2 * margin),
+    )
+
+
+def obituaryScreenOverlay(lines, footer, width, height):
+    """The 3D obituary screen: the same lines as the 2D one (the obituary,
+    then the lifetime chronicle), wrapped and centred on a dark backdrop
+    over the whole window, and a footer saying what happens next."""
+    size, step = OBITUARY_TEXT_SIZE, OBITUARY_LINE_HEIGHT
+    wrapped = wrapToWindow(lines, width, size)
+    room = max(1, int((height - 3 * step) / step))
+    if len(wrapped) > room:
+        wrapped = wrapped[: room - 1] + ["..."]
+    shown = wrapped + ([""] + [fitText(footer, width, size)] if footer else [])
+    top = height / 2 - len(shown) * step / 2
+    labels = []
+    for index, line in enumerate(shown):
+        if not line:
+            continue
+        color = DIM_TEXT_COLOR if footer and index == len(shown) - 1 else TEXT_COLOR
+        labels.append(
+            Label(
+                line, width / 2 - len(line) * size / 2, top + index * step, size, color
+            )
+        )
+    return labels, [Panel(0, 0, width, height, OBITUARY_BACKDROP)]
+
+
 def hudOverlay(game, width, height):
     """Screen text, and the panels behind it, for the game's current state."""
+    screen = getattr(game, "strataObituaryScreen", None)
+    if screen is not None:
+        # replaces the HUD, as the 2D obituary screen replaces the board
+        lines, footer = screen
+        return obituaryScreenOverlay(lines, footer, width, height)
     shop = getattr(game, "strataShop", None)
     if shop is not None:
         # The shop replaces the HUD: Strata draws every panel before any
@@ -381,36 +473,55 @@ def hudOverlay(game, width, height):
             )
         )
         labels.append(Label(text, width / 2 - 14 * len(text) / 2, height / 2, 26))
-    overlay = [
-        fitText(line, width, 18, margin=40)
-        for line in (getattr(game, "strataOverlayLines", None) or [])
-    ]
+    overlay = wrapToWindow(getattr(game, "strataOverlayLines", None) or [], width, 18)
+    # below the HUD's lines (score, level, upgrades, running power-ups), so
+    # it covers none of them
+    top = max(90, lineY + 4)
+    room = max(1, int((height - top - 60) / 28))
+    if len(overlay) > room:
+        overlay = overlay[: room - 1] + ["..."]
     if overlay:
         panels.append(
-            Panel(20, 90, width - 40, 28 * len(overlay) + 24, (0.05, 0.03, 0.03, 0.78))
+            Panel(20, top, width - 40, 28 * len(overlay) + 24, (0.05, 0.03, 0.03, 0.78))
         )
         for index, line in enumerate(overlay):
-            labels.append(Label(line, 40, 106 + 28 * index, 18))
+            labels.append(Label(line, 40, top + 16 + 28 * index, 18))
     return labels, panels
 
 
-def buildScene(game, width=900, height=700):
-    """Everything to draw for the game's current state, as a graphik grid3d
-    Scene: the board, the snake and pickups as pieces, and the HUD."""
-    grid = game.environment.getGrid()
-    columns, rows = grid.getColumns(), grid.getRows()
+def boardPieces(game):
+    """Every piece on the board this tick, as grid3d Pieces with ids that stay
+    the same from tick to tick (so an Animator can slide them): the pickups,
+    then the snake."""
     pieces = [
         pickupPiece(entity, gx, gy)
         for entity, gx, gy in entityCells(game)
         if not isinstance(entity, SnakePart)
     ]
     head = game.selectedSnakePart
+    parts = snakeGridParts(game)
     pieces += snakePieces(
-        snakeGridCells(game), head.getDirection(), rgb(head.getColor())
+        [cell for cell, _ in parts],
+        head.getDirection(),
+        rgb(head.getColor()),
+        colors=[color for _, color in parts],
     )
+    return pieces
+
+
+def buildScene(game, width=900, height=700, positions=None):
+    """Everything to draw for the game's current state, as a graphik grid3d
+    Scene: the board, the snake and pickups as pieces, and the HUD.
+    `positions` maps piece ids to world (x, z) for this frame (a grid3d
+    Animator's, sliding pieces between ticks); pieces without one stand on
+    their cells."""
+    grid = game.environment.getGrid()
+    columns, rows = grid.getColumns(), grid.getRows()
+    pieces = boardPieces(game)
     labels, panels = hudOverlay(game, width, height)
     return GridBoard(columns, rows, THEME).scene(
         pieces,
+        positions=positions,
         labels=labels,
         panels=panels,
         aspect=width / float(height),

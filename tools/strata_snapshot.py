@@ -92,6 +92,25 @@ def steerTowardsPickup(game):
         game.setDirectionIfAllowed(options[0])
 
 
+def saveDeathScreens(game, renderer, out):
+    """The two frames a death shows, as the game draws them: the red board
+    with the obituary over it, then the obituary screen. The run is recorded
+    into the temporary save, as a real death would be."""
+    game.syncPieces(snap=True)  # every piece on its cell
+    game.collision = True
+    game.recordCurrentRun("collision", presentedByRenderer=True)
+    game.renderCollisionFrame()
+    path = os.path.join(out, "ophidian-death-1-collision.png")
+    renderer.savePng(path)
+    print(path)
+    game.strataOverlayLines = None
+    game.strataObituaryScreen = game.obituaryScreen()
+    game.renderFrame(present=False)
+    path = os.path.join(out, "ophidian-death-2-obituary.png")
+    renderer.savePng(path)
+    print(path)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default="strata-shots")
@@ -100,6 +119,19 @@ def main(argv=None):
     parser.add_argument("--width", type=int, default=900)
     parser.add_argument("--height", type=int, default=700)
     parser.add_argument("--level", type=int, default=1)
+    parser.add_argument(
+        "--slide",
+        type=float,
+        default=1.0,
+        help="how far through its slide between ticks to draw each piece "
+        "(0 = where it was a tick ago, 1 = on its cell)",
+    )
+    parser.add_argument(
+        "--obituary",
+        action="store_true",
+        help="also save the death screens: the red collision frame and the "
+        "obituary screen, for the run as it stands after the last tick",
+    )
     args = parser.parse_args(argv)
 
     out = os.path.abspath(args.out)
@@ -112,7 +144,10 @@ def main(argv=None):
 
     renderer = StrataRenderer(args.width, args.height, window=False)
     try:
-        game = StrataOphidian(renderer=renderer)
+        # the game's clock runs one tick per tick played, as in the window,
+        # so pieces slide as they do there however fast this loop runs
+        clock = [0.0]
+        game = StrataOphidian(renderer=renderer, clock=lambda: clock[0])
         if args.level != 1:
             game.level = args.level
             game.initialize()
@@ -122,14 +157,21 @@ def main(argv=None):
             while tick < stop and game.running:
                 steerTowardsPickup(game)
                 game.playTick()
+                clock[0] += game.tickSeconds()
                 tick += 1
-            game.renderFrame(present=False)
+            # the frame `--slide` of the way through the last tick's slide
+            motion = game.strataMotion
+            game.renderFrame(
+                present=False, now=motion.startedAt + motion.tickSeconds * args.slide
+            )
             path = os.path.join(out, "ophidian-tick-%03d.png" % stop)
             renderer.savePng(path)
             print(
                 "%s  length %d  score %s  level %d"
                 % (path, len(game.snakeParts), game.score, game.level)
             )
+        if args.obituary:
+            saveDeathScreens(game, renderer, out)
         times = game.strataFrameMs
         if times:
             print(

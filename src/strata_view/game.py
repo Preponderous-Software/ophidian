@@ -4,6 +4,11 @@ StrataOphidian is the ordinary game with a different face: it runs the same
 rules as the text UI (no pygame display; keys go through the text UI's key
 tables), but draws each frame with Strata instead of printing to a terminal.
 Nothing about how a tick plays changes - the view only reads game state.
+
+Pieces glide: each game tick hands the board's pieces to a grid3d Animator
+(syncPieces), and every frame draws them where the Animator has slid them to
+by then, so the snake moves smoothly at any frame rate while the rules still
+step a whole cell per tick.
 """
 
 import contextlib
@@ -19,9 +24,17 @@ from controls.keybindings import (
     directionTowards,
 )
 from ophidian import Ophidian
+from preponderous.graphik.grid3d import Animator
 from progression.obituary import formatObituaryScreen
 from strata_view import StrataUnavailable
-from strata_view.scene import buildScene, headScreenPosition
+from strata_view.scene import (
+    COLLISION_CAPTION,
+    OBITUARY_SCREEN_SECONDS,
+    boardPieces,
+    buildScene,
+    cellCenter,
+    headScreenPosition,
+)
 from strata_view.shop import StrataShop
 
 
@@ -71,51 +84,144 @@ def _silentTextRenderer():
 
 
 class StrataOphidian(Ophidian):
-    def __init__(self, renderer=None, recordPath=None):
+    def __init__(
+        self, renderer=None, recordPath=None, reducedMotion=False, clock=time.monotonic
+    ):
+        # set before super().__init__, whose initialize() marks a snap
+        self.strataSnapPieces = True
         with _silentTextRenderer():
             super().__init__(useTextUI=True, recordPath=recordPath)
         self.renderer = renderer
+        self.clock = clock
         self.strataBanner = None
         self.strataOverlayLines = None
+        # (lines, footer) while the obituary screen is up (renderObituaryScreen)
+        self.strataObituaryScreen = None
         self.strataFrameMs = []
+        # slides pieces between ticks; reducedMotion puts them straight on
+        # their cells instead
+        self.strataMotion = Animator(self.cellCenter, reducedMotion=reducedMotion)
+        self.syncPieces(snap=True)
         # the upgrade shop while it's open (see openShop), and when it opened
         self.strataShop = None
         self.strataShopOpenedAt = None
 
+    # -- motion between ticks
+
+    def cellCenter(self, column, row):
+        grid = self.environment.getGrid()
+        return cellCenter(column, row, grid.getColumns(), grid.getRows())
+
+    def initialize(self):
+        """A new run or level: the next pieces go straight onto their cells
+        rather than sliding over from the old board."""
+        super().initialize()
+        self.strataSnapPieces = True
+
+    def syncPieces(self, snap=False, tickSeconds=0.0):
+        """Hands this tick's pieces to the Animator, which slides each one
+        from where it was drawn to its cell over `tickSeconds`. A piece that
+        is new this tick (a fresh pickup, the segment a meal grew) appears
+        on its cell; one that moved further than a cell jumps; `snap` (and a
+        pending restart or new level) puts every piece on its cell."""
+        snap = snap or self.strataSnapPieces
+        self.strataSnapPieces = False
+        self.strataMotion.update(
+            boardPieces(self), self.clock(), 0.0 if snap else tickSeconds, snap=snap
+        )
+
+    def piecePositions(self, now=None):
+        """Where each piece is drawn at `now` (default: the clock's now)."""
+        if self.strataSnapPieces:
+            # restarted since the last tick (the R key, the shop): show the
+            # new board as it stands
+            self.syncPieces(snap=True)
+        return self.strataMotion.positions(self.clock() if now is None else now)
+
+    def tickSeconds(self):
+        """How long until the next tick, which is how long a slide takes:
+        none with the speed limit off, when ticks come as fast as frames."""
+        return self.config.tickSpeed if self.config.limitTickSpeed else 0.0
+
     # -- drawing
 
-    def renderFrame(self, present=True):
+    def renderFrame(self, present=True, now=None):
         if self.renderer is None:
             return
         started = time.perf_counter()
-        scene = buildScene(self, self.renderer.width, self.renderer.height)
+        scene = buildScene(
+            self,
+            self.renderer.width,
+            self.renderer.height,
+            positions=self.piecePositions(now),
+        )
         self.renderer.draw(scene)
         if present:
             self.renderer.present()
         self.strataFrameMs.append((time.perf_counter() - started) * 1000.0)
 
     def renderCollisionFrame(self):
-        """The death frame: the board tinted red, with the obituary over it."""
+        """The death frame, as the 2D window has it: the board turned red,
+        held for 20 ticks before the obituary screen. Here the game's own
+        death line and the obituary are written over it as well."""
+        lines = [COLLISION_CAPTION]
         if self.lastObituary is not None:
-            self.strataOverlayLines = formatObituaryScreen(
+            lines += [""] + formatObituaryScreen(
                 self.lastObituary, self.saveManager.data["lifetimeStats"]
             )
+        self.strataOverlayLines = lines
         self.renderFrame()
+
+    def obituaryScreen(self):
+        """(lines, footer) for the obituary screen: the 2D screen's lines
+        (formatObituaryScreen) and what happens next."""
+        lines = formatObituaryScreen(
+            self.lastObituary, self.saveManager.data["lifetimeStats"]
+        )
+        if not self.running:
+            footer = None  # the window is closing
+        elif self.collision and self.config.restartUponCollision:
+            footer = "A new run begins in a moment."
+        elif self.collision:
+            footer = "The run is over."
+        else:
+            footer = None
+        return lines, footer
+
+    def renderObituaryScreen(self):
+        """The 2D window's obituary screen, in 3D: after a death (once the
+        red collision frame has been held) and on the way out, the obituary
+        and lifetime chronicle over the whole window for 1.5 seconds. The
+        base class skips it in text mode, which this window runs the rules
+        in, so it is drawn here."""
+        if self.lastObituary is None:
+            return
+        self.strataObituaryScreen = self.obituaryScreen()
+        self.renderFrame()
+        self.holdWindow(OBITUARY_SCREEN_SECONDS, whileRunning=False)
+        self.strataObituaryScreen = None
 
     def holdFrame(self, seconds):
         """Keeps the window responsive while a frame is held (the collision
         frame), redrawing it rather than sleeping on a frozen window."""
+        self.holdWindow(seconds)
+        self.strataOverlayLines = None
+
+    def holdWindow(self, seconds, whileRunning=True):
+        """Redraws for `seconds`, answering the window's close button. A
+        hold that is part of quitting (whileRunning=False) runs its time out
+        even though the game has stopped."""
         if self.renderer is None or not self.renderer.isWindow:
-            self.strataOverlayLines = None
             return
         until = time.monotonic() + seconds
-        while time.monotonic() < until and self.running:
+        while time.monotonic() < until and (self.running or not whileRunning):
             for event in self.renderer.pollEvents():
                 if event.type == self.renderer.strata.EVENT_QUIT:
+                    if not self.running:
+                        return  # closing again while it closes: go now
                     self.running = False
             self.renderFrame()
             time.sleep(1 / 60)
-        self.strataOverlayLines = None
 
     # -- one tick, shared by the window loop and the snapshot tool
 
@@ -126,6 +232,7 @@ class StrataOphidian(Ophidian):
             self.moveSelectedSnakePart()
         self.strataBanner = self.uiBanner.current()
         self.advanceTick()
+        self.syncPieces(tickSeconds=self.tickSeconds())
 
     def handleScancode(self, scancode):
         if self.strataShop is not None:
@@ -231,7 +338,7 @@ class StrataOphidian(Ophidian):
         self.quitApplication()
 
 
-def runStrataGame(recordPath=None):
+def runStrataGame(recordPath=None, reducedMotion=False):
     from strata_view.renderer import StrataRenderer
 
     try:
@@ -244,6 +351,8 @@ def runStrataGame(recordPath=None):
     except Exception as error:  # no display, no GPU driver, unsupported platform
         raise StrataUnavailable("no Strata window could be opened: %s" % error)
     try:
-        StrataOphidian(renderer=renderer, recordPath=recordPath).runStrataWindow()
+        StrataOphidian(
+            renderer=renderer, recordPath=recordPath, reducedMotion=reducedMotion
+        ).runStrataWindow()
     finally:
         renderer.close()

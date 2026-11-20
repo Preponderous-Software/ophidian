@@ -668,8 +668,9 @@ class Ophidian:
                 self.recordCurrentRun("collision", presentedByRenderer=True)
                 self.renderCollisionFrame()
                 self.holdFrame(self.config.tickSpeed * 20)
-                if not self.config.useTextUI:
-                    self.renderObituaryScreen()
+                # a no-op in the text UI, whose collision frame carries the
+                # obituary; the 2D and 3D windows show a screen of their own
+                self.renderObituaryScreen()
                 if self.config.restartUponCollision:
                     self.checkForLevelProgressAndReinitialize()
                 else:
@@ -1568,6 +1569,13 @@ def parseArguments(argv=None):
         "instead of falling back to 2D",
     )
     parser.add_argument(
+        "--reduced-motion",
+        dest="reducedMotion",
+        action="store_true",
+        help="In the 3D window, move pieces a cell at a time instead of "
+        "sliding them between cells",
+    )
+    parser.add_argument(
         "--record",
         metavar="PATH",
         help="Record the session as a time-sampled OpenUSD stage (.usda); needs "
@@ -1603,10 +1611,17 @@ if __name__ == "__main__":
 
     if chooseInterface(args) == "3d":
         from strata_view import StrataUnavailable
-        from strata_view.game import runStrataGame
 
         try:
-            runStrataGame(recordPath=args.record)
+            try:
+                from strata_view.game import runStrataGame
+            except ImportError as error:
+                # the 3D view is drawn by graphik's grid3d package, which
+                # an older graphik doesn't have
+                raise StrataUnavailable(
+                    "graphik's 3D grid view isn't installed (%s)" % error
+                )
+            runStrataGame(recordPath=args.record, reducedMotion=args.reducedMotion)
             sys.exit(0)
         except StrataUnavailable as reason:
             if args.strata:
