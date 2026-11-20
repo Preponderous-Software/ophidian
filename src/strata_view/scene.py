@@ -23,7 +23,6 @@ from controls.keybindings import (
 from food.food import Food
 from powerup.powerup import PowerUp
 from snake.snakePart import SnakePart
-from ui.text_wrap import wrapLinesToWidth
 
 # Shape kinds, matching Strata's PRIMITIVE_* values without importing them.
 CUBE, CAPSULE, CYLINDER, SPHERE = 0, 1, 2, 3
@@ -97,9 +96,14 @@ from preponderous.graphik.grid3d import (  # noqa: E402  (re-exported names)
     Scene,
     Shape,
     Theme,
+    cellScreenPosition,
+    centredLabel,
     fitCamera,
+    fitText,
+    projectToScreen,
     rgba,
     shade,
+    wrapText,
 )
 from preponderous.graphik.grid3d import cellCenter as _gridCellCenter  # noqa: E402
 from preponderous.graphik.grid3d import rgb255 as rgb  # noqa: E402
@@ -154,44 +158,6 @@ def cellCenter(x, y, columns, rows):
     return _gridCellCenter(x, y, columns, rows)
 
 
-def projectToScreen(camera, point, width, height):
-    """Where a world point lands in the window, in pixels from the top-left,
-    or None when it's behind the camera. The same right-handed look-at and
-    OpenGL perspective the renderer asks Strata for (up is +y); Strata 0.7.0
-    has no projection call of its own, so it's done here."""
-    import math
-
-    def sub(a, b):
-        return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
-
-    def dot(a, b):
-        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
-    def cross(a, b):
-        return (
-            a[1] * b[2] - a[2] * b[1],
-            a[2] * b[0] - a[0] * b[2],
-            a[0] * b[1] - a[1] * b[0],
-        )
-
-    def unit(a):
-        length = math.sqrt(dot(a, a))
-        return (a[0] / length, a[1] / length, a[2] / length)
-
-    forward = unit(sub(camera.target, camera.eye))
-    right = unit(cross(forward, (0.0, 1.0, 0.0)))
-    up = cross(right, forward)
-    offset = sub(point, camera.eye)
-    depth = dot(offset, forward)
-    if depth <= 0:
-        return None
-    focal = 1.0 / math.tan(math.radians(camera.fovDegrees) / 2.0)
-    aspect = width / float(height)
-    ndcX = focal / aspect * dot(offset, right) / depth
-    ndcY = focal * dot(offset, up) / depth
-    return ((ndcX + 1.0) / 2.0 * width, (1.0 - ndcY) / 2.0 * height)
-
-
 def headScreenPosition(game, width, height):
     """The middle of the snake's head in the window, for aiming a tap."""
     grid = game.environment.getGrid()
@@ -199,9 +165,16 @@ def headScreenPosition(game, width, height):
     location = game.getLocation(game.selectedSnakePart)
     if location == -1:
         return None
-    x, z = cellCenter(location.getX(), location.getY(), columns, rows)
     camera = cameraFor(columns, rows, width / float(height))
-    return projectToScreen(camera, (x, BED_TOP + 0.4, z), width, height)
+    return cellScreenPosition(
+        camera,
+        GridBoard(columns, rows, THEME),
+        location.getX(),
+        location.getY(),
+        width,
+        height,
+        y=BED_TOP + 0.4,
+    )
 
 
 def cameraFor(columns, rows, aspect=1.0):
@@ -354,13 +327,6 @@ def snakeGridParts(game):
     return parts
 
 
-def fitText(text, width, pixelSize, margin=18):
-    """Cut text to what fits across `width` pixels. Strata's built-in font
-    is monospaced, about one pixel size wide per character."""
-    room = max(4, int((width - 2 * margin) / pixelSize))
-    return text if len(text) <= room else text[: room - 3] + "..."
-
-
 def durationMeter(fractionRemaining, cells=10):
     """A power-up's time left as an ASCII bar, e.g. [######----]. ASCII
     because Strata's built-in font may not have the text UI's block
@@ -372,12 +338,9 @@ def durationMeter(fractionRemaining, cells=10):
 def wrapToWindow(lines, width, pixelSize, margin=40):
     """Word-wrap lines to the window, as the 2D obituary screen does (issue
     #139: a cut line lost the ophidian's name or its cause of death).
-    Strata's font is monospaced, about one pixel size per character."""
-    return wrapLinesToWidth(
-        lines,
-        lambda text: len(text) * pixelSize,
-        max(pixelSize * 4, width - 2 * margin),
-    )
+    Strata's font is monospaced, one pixel size per character (graphik's
+    wrapText measures it so)."""
+    return wrapText(list(lines), max(pixelSize * 4, width - 2 * margin), pixelSize)
 
 
 def obituaryScreenOverlay(lines, footer, width, height):
@@ -396,10 +359,9 @@ def obituaryScreenOverlay(lines, footer, width, height):
         if not line:
             continue
         color = DIM_TEXT_COLOR if footer and index == len(shown) - 1 else TEXT_COLOR
+        # centred across the window, its top on the line
         labels.append(
-            Label(
-                line, width / 2 - len(line) * size / 2, top + index * step, size, color
-            )
+            centredLabel(line, width / 2, top + index * step, size, color, rise=0)
         )
     return labels, [Panel(0, 0, width, height, OBITUARY_BACKDROP)]
 

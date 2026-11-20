@@ -6,8 +6,8 @@ the same upgrades (progression.shop), the same purchase rule
 as screen-space labels and panels over the board. Only the drawing differs.
 """
 
+from preponderous.graphik.grid3d import centredLabel, wrapText
 from progression.shop import listUpgrades, purchaseUpgrade
-from ui.text_wrap import wrapLineToWidth
 
 # SDL scancodes the shop answers to, matching PygameShopScreen's keys.
 SHOP_UP = {82, 26}  # Up, W
@@ -63,22 +63,18 @@ class StrataShop:
 
         def centred(text, y, size, color):
             text = fitText(text, width, size, margin=28)
-            labels.append(Label(text, (width - size * len(text)) / 2, y, size, color))
+            labels.append(centredLabel(text, width / 2, y, size, color, rise=0))
 
         centred("Ophidian Shop", 22, 28, TITLE_COLOR)
         centred("Currency: {}".format(data.get("currency", 0)), 60, 18, CURRENCY_COLOR)
         # Descriptions wrap rather than being cut short, so the whole text
-        # the 2D shop shows is readable here too. The built-in font is
-        # monospaced, about one pixel size wide per character.
+        # the 2D shop shows is readable here too (graphik's wrapText
+        # measures Strata's monospaced font).
         descriptionSize, lineGap = 12, 18
         maxWidth = width - 2 * 40
         rowY = 100
         for index, upgrade in enumerate(self.upgrades):
-            lines = wrapLineToWidth(
-                upgrade["description"],
-                lambda text: descriptionSize * len(text),
-                maxWidth,
-            )
+            lines = wrapText([upgrade["description"]], maxWidth, descriptionSize)
             rowHeight = 30 + lineGap * len(lines) + 14
             if index == self.selectedIndex:
                 panels.append(
