@@ -941,6 +941,13 @@ class Ophidian:
             self.running = False
         elif action == ACTION_TOGGLE_TICK_SPEED_LIMIT:
             self.config.limitTickSpeed = not self.config.limitTickSpeed
+            # the change is only otherwise visible as the snake's pace, so
+            # say which way the toggle went
+            self.uiBanner.pushNow(
+                "Speed limit on: normal pace."
+                if self.config.limitTickSpeed
+                else "Speed limit off: the snake runs as fast as it can."
+            )
         elif action == ACTION_TOGGLE_FULLSCREEN:
             self.config.fullscreen = not self.config.fullscreen
             self.initializeGameDisplay()
@@ -1549,6 +1556,18 @@ def parseArguments(argv=None):
         help="Use text-based UI instead of graphical UI",
     )
     parser.add_argument(
+        "--2d",
+        dest="flat",
+        action="store_true",
+        help="Play in the classic 2D window instead of the 3D one",
+    )
+    parser.add_argument(
+        "--strata",
+        action="store_true",
+        help="Insist on the 3D window: stop with the reason if it can't start, "
+        "instead of falling back to 2D",
+    )
+    parser.add_argument(
         "--record",
         metavar="PATH",
         help="Record the session as a time-sampled OpenUSD stage (.usda); needs "
@@ -1557,12 +1576,45 @@ def parseArguments(argv=None):
     return parser.parse_args(argv)
 
 
+# Where the 3D window can run: Strata publishes libraries for these only.
+STRATA_PLATFORMS = ("linux", "win32")
+
+
+def chooseInterface(args, platform=None):
+    """Which UI to start: "text", "2d" or "3d". 3D is the default on Linux
+    and Windows desktops; the browser build doesn't come through here (it
+    starts from main.py)."""
+    platform = sys.platform if platform is None else platform
+    if args.text_ui:
+        return "text"
+    if args.flat:
+        return "2d"
+    if args.strata or platform in STRATA_PLATFORMS:
+        return "3d"
+    return "2d"
+
+
 if __name__ == "__main__":
     args = parseArguments()
     if args.record is not None and not UsdRecording.isAvailable():
         sys.exit(
             "--record needs the optional usd-recorder package: " + REQUIREMENTS_HINT
         )
+
+    if chooseInterface(args) == "3d":
+        from strata_view import StrataUnavailable
+        from strata_view.game import runStrataGame
+
+        try:
+            runStrataGame(recordPath=args.record)
+            sys.exit(0)
+        except StrataUnavailable as reason:
+            if args.strata:
+                sys.exit("The 3D window couldn't start: %s." % reason)
+            print(
+                "The 3D view isn't available here: %s.\n"
+                "Starting the 2D game instead (--2d skips this check)." % reason
+            )
 
     ophidian = Ophidian(useTextUI=args.text_ui, recordPath=args.record)
     ophidian.run()

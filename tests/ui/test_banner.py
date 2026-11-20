@@ -93,3 +93,13 @@ def test_draw_does_nothing_when_queue_empty():
         FakeGraphik(), width=500, backgroundColor=(0, 0, 0), textColor=(255, 255, 255)
     )
     assert calls == []
+
+
+def test_push_now_shows_a_reply_ahead_of_a_queued_message():
+    banner = UiBanner(durationSeconds=60)
+    banner.push("A long story line")
+    assert banner.current() == "A long story line"
+    banner.pushNow("Reply to a key press")
+    assert banner.current() == "Reply to a key press"
+    # the interrupted line is kept for afterwards
+    assert banner.queue == ["Reply to a key press", "A long story line"]

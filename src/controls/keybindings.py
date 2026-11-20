@@ -125,6 +125,41 @@ def buildPygameActionKeys(pygame):
     }
 
 
+# 3D window spellings (strata_view). Strata reports SDL scancodes, which are
+# folded to the terminal spellings above, so the 3D window runs every rule
+# through the same TEXT_UI_*_KEYS tables and can't drift from them.
+STRATA_SCANCODE_KEYS = {
+    26: "w",  # W
+    82: "w",  # Up
+    4: "a",  # A
+    80: "a",  # Left
+    22: "s",  # S
+    81: "s",  # Down
+    7: "d",  # D
+    79: "d",  # Right
+    20: "q",  # Q
+    41: "q",  # Escape
+    21: "r",  # R
+    15: "l",  # L
+    6: "c",  # C
+    19: "p",  # P
+    44: " ",  # Space
+}
+
+# 3D window keys with no terminal spelling (there is no terminal window to make
+# fullscreen), mapped straight to their actions, as buildPygameActionKeys
+# does for F11.
+STRATA_SCANCODE_ACTIONS = {
+    68: ACTION_TOGGLE_FULLSCREEN,  # F11
+}
+
+# The 3D window's controls line, kept beside the table it describes so the
+# two change together.
+STRATA_CONTROLS_HINT = (
+    "Arrows/WASD | Space pause | P shop | R restart | C skin | L speed | Q quit"
+)
+
+
 # How far, in pixels, a touch has to travel between going down and coming
 # up before it counts as a swipe rather than a tap. Below it, the press is
 # read as a tap and aimed from the snake's head instead (see
