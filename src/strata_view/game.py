@@ -34,6 +34,7 @@ from strata_view.scene import (
     buildScene,
     cellCenter,
     headScreenPosition,
+    obituaryScreenLines,
 )
 from strata_view.shop import StrataShop
 
@@ -177,18 +178,7 @@ class StrataOphidian(Ophidian):
     def obituaryScreen(self):
         """(lines, footer) for the obituary screen: the 2D screen's lines
         (formatObituaryScreen) and what happens next."""
-        lines = formatObituaryScreen(
-            self.lastObituary, self.saveManager.data["lifetimeStats"]
-        )
-        if not self.running:
-            footer = None  # the window is closing
-        elif self.collision and self.config.restartUponCollision:
-            footer = "A new run begins in a moment."
-        elif self.collision:
-            footer = "The run is over."
-        else:
-            footer = None
-        return lines, footer
+        return obituaryScreenLines(self)
 
     def renderObituaryScreen(self):
         """The 2D window's obituary screen, in 3D: after a death (once the

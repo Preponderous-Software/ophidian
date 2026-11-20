@@ -47,7 +47,15 @@ class UiBanner:
         return self.queue[0]
 
     def draw(self, graphik, width, backgroundColor, textColor):
+        """Draws the current message, if any, and returns it (the browser's
+        3D view shows the same one; current() may only be read once a
+        frame)."""
         message = self.current()
+        self.drawMessage(graphik, width, backgroundColor, textColor, message)
+        return message
+
+    @staticmethod
+    def drawMessage(graphik, width, backgroundColor, textColor, message):
         if message is None:
             return
         graphik.drawRectangle(0, 0, width, 30, backgroundColor)

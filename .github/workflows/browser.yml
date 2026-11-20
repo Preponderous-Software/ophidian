@@ -14,6 +14,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # the Strata release whose grid relay draws the browser's 3D view
+  STRATA_RELAY_VERSION: "0.9.0"
+
 jobs:
   browser:
     runs-on: ubuntu-latest
@@ -36,11 +40,26 @@ jobs:
           python -m pip install --no-deps --target src "$GRAPHIK"
           rm -rf src/*.dist-info
 
+      # graphik's pygbag template is pygbag 0.9.3's default page plus a 3D
+      # toggle and the Strata grid relay's canvas and loader scripts. The 2D
+      # game plays exactly as before until the toggle is pressed; nothing of
+      # the 3D view is downloaded until then.
       - name: Build with pygbag
-        run: python -m pygbag --build --title Ophidian src
+        run: |
+          TEMPLATE="$(PYTHONPATH=src python -c 'from preponderous.graphik.grid3d.web import templatePath; print(templatePath())')"
+          python -m pygbag --build --title Ophidian --template "$TEMPLATE" src
 
       - name: Check the build has an index page
         run: test -f src/build/web/index.html
+
+      # The 3D view's files (Strata's prebuilt grid relay), from Strata's
+      # release, checked against its SHA256SUMS, next to the page. Pinned:
+      # the relay's wire format must match graphik's grid3d.web.
+      - name: Put Strata's grid relay next to the page
+        run: |
+          PYTHONPATH=src python -m preponderous.graphik.grid3d.relay --strata ${{ env.STRATA_RELAY_VERSION }} --dest src/build/web
+          test -f src/build/web/grid-relay.js
+          grep -q 'id="graphik3d"' src/build/web/index.html
 
       - name: Write the deployed version
         run: echo "$(cat version.txt)+g${GITHUB_SHA::7}" > web-version.txt
