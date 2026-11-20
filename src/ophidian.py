@@ -895,6 +895,12 @@ class Ophidian:
             return None
         return self.performAction(action)
 
+    def handlePointerDown(self, position):
+        """A touch or mouse press going down: where it went down is kept
+        until it comes up (handlePointerGesture). The browser game reads a
+        press on its on-screen keys here first (strata_view.web)."""
+        self.pointerDownAt = position
+
     def handlePointerGesture(self, downAt, upAt):
         """Steers the snake from a touch (or mouse) press, for a phone,
         which has no keyboard.
@@ -1493,7 +1499,7 @@ class Ophidian:
                 elif event.type == self.pygame.MOUSEBUTTONDOWN:
                     # a touch arrives as a mouse press as well, in a
                     # browser and on the desktop alike
-                    self.pointerDownAt = event.pos
+                    self.handlePointerDown(event.pos)
                 elif event.type == self.pygame.MOUSEBUTTONUP:
                     if self.pointerDownAt is not None:
                         self.handlePointerGesture(self.pointerDownAt, event.pos)

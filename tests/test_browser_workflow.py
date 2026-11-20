@@ -55,11 +55,13 @@ def test_the_pinned_graphik_has_the_browser_3d_view():
     # with graphik 0.5.0; 0.5.1's template starts in 3D (remembering a
     # player's 2D), fetches the relay's scripts only when 3D is wanted, keeps
     # the page from scrolling (so a phone can't push the 2D/3D button off
-    # screen) and says where the button is (buttonArea)
+    # screen) and says where the button is (buttonArea); 0.5.2 frames the
+    # board for a phone held upright and has the on-screen keys (TouchKeys,
+    # touchScreen) a touch screen needs for the keyboard's actions
     version = re.search(
         r"graphik/archive/refs/tags/v(\d+)\.(\d+)\.(\d+)\.zip", REQUIREMENTS
     )
-    assert version and tuple(map(int, version.groups())) >= (0, 5, 1)
+    assert version and tuple(map(int, version.groups())) >= (0, 5, 2)
 
 
 def test_graphiks_template_keeps_the_page_still_and_the_relay_for_later():
