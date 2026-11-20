@@ -159,6 +159,13 @@ STRATA_CONTROLS_HINT = (
     "Arrows/WASD | Space pause | P shop | R restart | C skin | L speed | Q quit"
 )
 
+# The browser's 3D view's controls line: the same keys, less Q (a browser tab
+# has nothing to quit to; see Ophidian.initializeKeyBindings), and the
+# swipes and taps a phone steers with.
+WEB_CONTROLS_HINT = (
+    "Arrows/WASD or swipe/tap | Space pause | P shop | R restart | C skin | L speed"
+)
+
 
 # How far, in pixels, a touch has to travel between going down and coming
 # up before it counts as a swipe rather than a tap. Below it, the press is

@@ -21,6 +21,15 @@ there: progress (`save.json`) lasts only as long as the tab, and no usage
 reporting is sent at all. There is no quit key, as
 closing the tab ends the game.
 
+The **3D** button at the top right shows the board in 3D (the same view as the
+desktop 3D window), and **2D** switches back, in the middle of a run if you
+like: it is the same game either way, and every key, swipe and tap, the shop,
+pausing, skins, the speed limit and the death screens work in both. The 3D view
+is downloaded only when the button is pressed (about 1.3 MB); if your browser
+can't show it (no WebGL 2, say), the 2D view stays and the game says why. The
+page is built with graphik's pygbag template, and the build puts Strata's
+prebuilt grid relay, which draws the 3D view, next to it (see `browser.yml`).
+
 ## Requirements
 - Python 3.8 or newer (developed and tested on 3.10)
 - [pygame](https://www.pygame.org/) and [graphik](https://github.com/Stephenson-Software/graphik) — only for the graphical UI; `--text-ui` runs without them

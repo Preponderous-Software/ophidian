@@ -80,6 +80,11 @@ PROGRESS_YELLOW = (1.0, 1.0, 0.0, 0.9)
 PROGRESS_GREEN = (0.0, 1.0, 0.0, 0.9)
 BANNER_SIZE = 18
 BANNER_LINE_HEIGHT = 24
+# Below this width (a phone held upright, in the browser's 3D view) the HUD
+# shrinks lines that would run off the window, gives the progress share a
+# row of its own and wraps the controls line, rather than cutting text off.
+NARROW_WIDTH = 560
+SMALLEST_TEXT = 9
 
 
 # The scene description and the board/piece helpers are graphik's 3D grid
@@ -349,16 +354,20 @@ def obituaryScreenOverlay(lines, footer, width, height):
     over the whole window, and a footer saying what happens next."""
     size, step = OBITUARY_TEXT_SIZE, OBITUARY_LINE_HEIGHT
     wrapped = wrapToWindow(lines, width, size)
-    room = max(1, int((height - 3 * step) / step))
+    # the footer wraps too (a phone is narrower than the line)
+    footerLines = wrapToWindow([footer], width, size) if footer else [""]
+    room = max(1, int((height - (2 + len(footerLines)) * step) / step))
     if len(wrapped) > room:
         wrapped = wrapped[: room - 1] + ["..."]
-    shown = wrapped + ([""] + [fitText(footer, width, size)] if footer else [])
+    footerLines = footerLines if footer else []
+    shown = wrapped + ([""] + footerLines if footer else [])
     top = height / 2 - len(shown) * step / 2
     labels = []
     for index, line in enumerate(shown):
         if not line:
             continue
-        color = DIM_TEXT_COLOR if footer and index == len(shown) - 1 else TEXT_COLOR
+        isFooter = index >= len(shown) - len(footerLines)
+        color = DIM_TEXT_COLOR if footer and isFooter else TEXT_COLOR
         # centred across the window, its top on the line
         labels.append(
             centredLabel(line, width / 2, top + index * step, size, color, rise=0)
@@ -410,8 +419,38 @@ def bannerLines(banner, width):
     return wrapToWindow([banner], width, BANNER_SIZE, margin=18)
 
 
+def fitSize(text, width, pixelSize, margin=18, smallest=SMALLEST_TEXT):
+    """The largest pixel size up to `pixelSize` at which `text` fits across
+    `width` (Strata's font is one pixel size wide per character), but never
+    below `smallest`."""
+    room = (width - 2 * margin) / max(1, len(text))
+    return max(smallest, min(pixelSize, int(room)))
+
+
+def obituaryScreenLines(game):
+    """(lines, footer) for the 3D obituary screen: the 2D screen's lines
+    (formatObituaryScreen) and what happens next."""
+    from progression.obituary import formatObituaryScreen
+
+    lines = formatObituaryScreen(
+        game.lastObituary, game.saveManager.data["lifetimeStats"]
+    )
+    if not game.running:
+        footer = None  # the window is closing
+    elif game.collision and game.config.restartUponCollision:
+        footer = "A new run begins in a moment."
+    elif game.collision:
+        footer = "The run is over."
+    else:
+        footer = None
+    return lines, footer
+
+
 def hudOverlay(game, width, height):
-    """Screen text, and the panels behind it, for the game's current state."""
+    """Screen text, and the panels behind it, for the game's current state.
+
+    A game may set `strataControlsHint` to its own controls line (the
+    browser's names swipes and taps and has no quit key)."""
     screen = getattr(game, "strataObituaryScreen", None)
     if screen is not None:
         # replaces the HUD, as the 2D obituary screen replaces the board
@@ -422,28 +461,41 @@ def hudOverlay(game, width, height):
         # The shop replaces the HUD: Strata draws every panel before any
         # text, so HUD text would otherwise show through the shop's backdrop.
         return shop.overlay(width, height, Label, Panel, fitText)
+    narrow = width < NARROW_WIDTH
     currency = game.saveManager.data.get("currency", 0)
+    stats = f"Level {game.level}  Length {len(game.snakeParts)}  Currency {currency}"
+    score = game.getScoreLabel()
     labels = [
-        Label(game.getScoreLabel(), 18, 16, 26),
+        Label(score, 18, 16, fitSize(score, width, 26) if narrow else 26),
         Label(
-            f"Level {game.level}  Length {len(game.snakeParts)}  Currency {currency}",
+            stats,
             18,
             50,
-            18,
+            fitSize(stats, width, 18) if narrow else 18,
             DIM_TEXT_COLOR,
         ),
     ]
     # the share of the board filled, beside the score: the number the
     # progress bar along the bottom draws, as the text UI prints it
     progress = progressText(game)
-    labels.append(
-        Label(progress, width - 18 - 18 * len(progress), 22, 18, DIM_TEXT_COLOR)
-    )
+    lineY = 78
+    if narrow:
+        # no room beside the score on a phone: a row of its own
+        labels.append(Label(progress, 18, lineY, 14, DIM_TEXT_COLOR))
+        lineY += 22
+    else:
+        labels.append(
+            Label(progress, width - 18 - 18 * len(progress), 22, 18, DIM_TEXT_COLOR)
+        )
     # The same readout the 2D and text HUDs keep on screen: owned upgrades
     # in play, then each running power-up with its seconds and a meter.
-    lineY = 78
     upgrades = game.getActiveUpgradesSummary()
-    if upgrades:
+    if upgrades and narrow:
+        # one or more rows on a phone, rather than cut
+        for line in _joinHintLines(upgrades, width - 36, 14):
+            labels.append(Label(line, 18, lineY, 14, DIM_TEXT_COLOR))
+            lineY += 22
+    elif upgrades:
         labels.append(
             Label(
                 fitText(" | ".join(upgrades), width, 14), 18, lineY, 14, DIM_TEXT_COLOR
@@ -451,17 +503,18 @@ def hudOverlay(game, width, height):
         )
         lineY += 22
     for status in game.getActivePowerUpStatuses():
+        line = "[{}] {}: {}s {}".format(
+            status["symbol"],
+            status["label"],
+            math.ceil(status["secondsRemaining"]),
+            durationMeter(status["fractionRemaining"]),
+        )
         labels.append(
             Label(
-                "[{}] {}: {}s {}".format(
-                    status["symbol"],
-                    status["label"],
-                    math.ceil(status["secondsRemaining"]),
-                    durationMeter(status["fractionRemaining"]),
-                ),
+                line,
                 18,
                 lineY,
-                14,
+                fitSize(line, width, 14) if narrow else 14,
                 rgba(rgb(status["color"])) if status.get("color") else TEXT_COLOR,
             )
         )
@@ -473,16 +526,16 @@ def hudOverlay(game, width, height):
     bottom = height - PROGRESS_BAR_HEIGHT - 6
     showControls = game.paused or game.tick < CONTROLS_HINT_TICKS
     if showControls:
-        bottom -= 20
-        labels.append(
-            Label(
-                fitText(STRATA_CONTROLS_HINT, width, CONTROLS_HINT_SIZE),
-                18,
-                bottom,
-                CONTROLS_HINT_SIZE,
-                DIM_TEXT_COLOR,
-            )
-        )
+        hint = getattr(game, "strataControlsHint", None) or STRATA_CONTROLS_HINT
+        if narrow:
+            # wrapped at its " | " breaks rather than cut, so every control
+            # can be read on a phone
+            hintLines = _joinHintLines(hint.split(" | "), width - 36)
+        else:
+            hintLines = [fitText(hint, width, CONTROLS_HINT_SIZE)]
+        for line in reversed(hintLines):
+            bottom -= 20
+            labels.append(Label(line, 18, bottom, CONTROLS_HINT_SIZE, DIM_TEXT_COLOR))
     banner = getattr(game, "strataBanner", None)
     if banner:
         lines = bannerLines(banner, width)
@@ -497,7 +550,15 @@ def hudOverlay(game, width, height):
                     DIM_TEXT_COLOR,
                 )
             )
-    if game.paused:
+    if game.paused and narrow:
+        text = "Paused (space to resume)"
+        size = fitSize(text, width, 26, margin=30)
+        textWidth = size * len(text)
+        panels.append(
+            Panel(width / 2 - textWidth / 2 - 12, height / 2 - 14, textWidth + 24, 52)
+        )
+        labels.append(Label(text, width / 2 - textWidth / 2, height / 2, size))
+    elif game.paused:
         text = "Paused (space to resume)"
         panels.append(
             Panel(
@@ -522,6 +583,19 @@ def hudOverlay(game, width, height):
         for index, line in enumerate(overlay):
             labels.append(Label(line, 40, top + 16 + 28 * index, 18))
     return labels, panels
+
+
+def _joinHintLines(parts, maxWidth, size=CONTROLS_HINT_SIZE):
+    """Packs a line's parts (a control, an upgrade) back together with " | "
+    into as few lines as fit across maxWidth at `size`."""
+    lines = []
+    for part in parts:
+        candidate = part if not lines else lines[-1] + " | " + part
+        if lines and len(candidate) * size <= maxWidth:
+            lines[-1] = candidate
+        else:
+            lines.append(part)
+    return lines
 
 
 def boardPieces(game):
