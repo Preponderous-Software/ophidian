@@ -217,3 +217,33 @@ def test_the_graphical_drawing_steps_are_noops_in_text_ui_mode(tmp_path, monkeyp
     # the banner is left queued, its timer unstarted, for the text renderer
     assert game.uiBanner.queue[-1] == "A message only the text renderer should show"
     assert game.uiBanner.expiresAt is None
+
+
+def test_a_first_level_run_says_what_the_run_is_for(tmp_path, monkeypatch):
+    # nothing on screen said that eating grows the snake or that filling a
+    # share of the board ends the level; until a level has been cleared,
+    # each run starts by saying so (after its biome line)
+    game = _makeGame(monkeypatch, tmp_path)
+    game.uiBanner.queue.clear()
+
+    game.initialize()
+
+    assert game.uiBanner.queue[-1] == (
+        "Eat food to grow. Fill 50% of the board to clear the level."
+    )
+    assert "enters" in game.uiBanner.queue[-2]
+
+
+def test_the_goal_line_stops_once_a_level_has_been_cleared(tmp_path, monkeypatch):
+    game = _makeGame(monkeypatch, tmp_path)
+    game.saveManager.data["lifetimeStats"]["highestLevelReached"] = 2
+    game.uiBanner.queue.clear()
+
+    game.initialize()
+
+    assert not any(m.startswith("Eat food to grow") for m in game.uiBanner.queue)
+    game.level = 2
+    game.saveManager.data["lifetimeStats"]["highestLevelReached"] = 1
+    game.uiBanner.queue.clear()
+    game.initialize()
+    assert not any(m.startswith("Eat food to grow") for m in game.uiBanner.queue)

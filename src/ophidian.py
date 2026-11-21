@@ -1343,8 +1343,19 @@ class Ophidian:
         self.spawnStartingSegments(startingSegments)
         ophidianName = self.saveManager.data["ophidianName"]
         self.notify(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
+        if self.level == 1 and self.saveManager.data["lifetimeStats"].get(
+            "highestLevelReached", 1
+        ) <= 1:
+            # until a level has been cleared, every UI says what the run is for
+            self.notify(self.goalMessage())
         # after the body, so that no segment is ever laid over the pickup
         self.spawnPickup()
+
+    def goalMessage(self):
+        """What a run is for, in one line: how to grow and when a level ends
+        (the share the progress bar fills towards)."""
+        required = int(round(self.config.levelProgressPercentageRequired * 100))
+        return f"Eat food to grow. Fill {required}% of the board to clear the level."
 
     def endOfTick(self):
         """Closes out one movement step, for both UI loops.
