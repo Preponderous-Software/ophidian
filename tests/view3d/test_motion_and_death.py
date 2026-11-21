@@ -318,10 +318,13 @@ def test_the_hud_has_the_2d_windows_level_progress_bar():
     ):
         game.snakeParts = [game.selectedSnakePart] * count
         labels, panels = scene.hudOverlay(game, width, height)
-        backdrop, fill = [
+        backdrop, fill, goal = [
             p for p in panels if p.y == height - scene.PROGRESS_BAR_HEIGHT
         ]
         assert backdrop.width == width
+        # the mark where the level ends
+        assert goal.x + goal.width / 2 == pytest.approx(width * required)
+        assert goal.color == scene.PROGRESS_GOAL_COLOR
         assert fill.width == pytest.approx(width * min(1.0, count / cells))
         assert fill.color == color
         text = "Progress {}%/{}%".format(int(count / cells * 100), int(required * 100))

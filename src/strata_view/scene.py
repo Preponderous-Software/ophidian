@@ -82,6 +82,9 @@ PROGRESS_BACKDROP = (0.0, 0.0, 0.0, 0.85)
 PROGRESS_RED = (1.0, 0.0, 0.0, 0.9)
 PROGRESS_YELLOW = (1.0, 1.0, 0.0, 0.9)
 PROGRESS_GREEN = (0.0, 1.0, 0.0, 0.9)
+# the mark on the bar where the level ends
+PROGRESS_GOAL_WIDTH = 4
+PROGRESS_GOAL_COLOR = (1.0, 1.0, 1.0, 1.0)
 BANNER_SIZE = 18
 BANNER_LINE_HEIGHT = 24
 # Below this width (a phone held upright, in the browser's 3D view) the HUD
@@ -451,6 +454,17 @@ def progressOverlay(game, width, height):
                 0, top, filled, PROGRESS_BAR_HEIGHT, progressColor(fraction, required)
             )
         )
+    # where the level ends, so the bar shows how far there is to go (as 2D)
+    goal = width * max(0.0, min(1.0, required))
+    panels.append(
+        Panel(
+            goal - PROGRESS_GOAL_WIDTH / 2,
+            top,
+            PROGRESS_GOAL_WIDTH,
+            PROGRESS_BAR_HEIGHT,
+            PROGRESS_GOAL_COLOR,
+        )
+    )
     return [], panels
 
 

@@ -78,6 +78,8 @@ from controls.keybindings import (
 POWER_UP_INDICATOR_ROW_HEIGHT = 24
 POWER_UP_INDICATOR_METER_WIDTH = 140
 POWER_UP_INDICATOR_METER_HEIGHT = 4
+# the mark on the level-progress bar where the level ends
+PROGRESS_GOAL_WIDTH = 4
 
 # Type of the obituary screen's text, and the gutter left either side of it.
 # The font has to be named here as well as inside Graphik.drawText, because
@@ -1553,6 +1555,13 @@ class Ophidian:
                 )
             self.pygame.draw.rect(
                 self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1
+            )
+            # where the level ends, so the bar shows how far there is to go
+            goalX = int(x * self.config.levelProgressPercentageRequired)
+            self.pygame.draw.rect(
+                self.gameDisplay,
+                self.config.white,
+                (goalX - PROGRESS_GOAL_WIDTH // 2, y - 20, PROGRESS_GOAL_WIDTH, 20),
             )
 
             self.drawHud()

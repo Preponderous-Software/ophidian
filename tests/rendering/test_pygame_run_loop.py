@@ -359,3 +359,15 @@ def test_hold_frame_sleeps_outside_the_async_loop(pygameGame, monkeypatch):
 
     assert slept == [1.5]
     assert game.heldFrames == []
+
+
+def test_pygame_progress_bar_marks_where_the_level_ends(pygameGame, monkeypatch):
+    # the bar filled towards an end it never showed; the mark is the goal
+    game = pygameGame
+
+    _drawOneFrameAtLength(game, monkeypatch, 1)
+
+    width, height = game.gameDisplay.get_size()
+    goalX = int(width * game.config.levelProgressPercentageRequired)
+    assert tuple(game.gameDisplay.get_at((goalX, height - 10)))[:3] == game.config.white
+    assert tuple(game.gameDisplay.get_at((goalX + 10, height - 10)))[:3] == game.config.black

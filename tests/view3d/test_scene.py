@@ -88,8 +88,9 @@ def test_the_paused_notice_and_the_obituary_get_a_backdrop(game):
     built = scene.buildScene(game, 900, 700)
     texts = [label.text for label in built.labels]
     assert "Paused (space to resume)" in texts and "It ended." in texts
-    # the progress bar's two panels, then the notice's and the obituary's
-    assert len(built.panels) == 4
+    # the progress bar's three panels (backdrop, fill, goal mark), then the
+    # notice's and the obituary's
+    assert len(built.panels) == 5
 
 
 def test_arrow_keys_steer_through_the_text_ui_key_tables(game):
