@@ -143,6 +143,25 @@ def _headEyes(piece, x, z, baseY):
     return shapes
 
 
+FOOD_HEIGHT = 0.56
+STEM_COLOR = (0.36, 0.22, 0.10)
+LEAF_COLOR = (0.42, 0.85, 0.30)
+
+
+def _foodStem(piece, x, z, baseY):
+    """A stem and a leaf on top of a piece of food. A segment the food grows
+    wears the food's colour (as in 2D), so without them the food on the board
+    and a body that has eaten read as the same red spheres; with them the
+    food reads as fruit at a glance."""
+    top = baseY + FOOD_HEIGHT
+    return [
+        Shape(CYLINDER, (x, top + 0.07, z), (0.09, 0.24, 0.09), rgba(STEM_COLOR)),
+        Shape(
+            SPHERE, (x + 0.14, top + 0.08, z), (0.30, 0.08, 0.16), rgba(LEAF_COLOR)
+        ),
+    ]
+
+
 # Ophidian's look. Piece colours come from the game (the snake's colour is
 # random per run), so the styles' own colours are only defaults.
 THEME = Theme(
@@ -155,7 +174,14 @@ THEME = Theme(
         "body": PieceStyle(
             SPHERE, height=SEGMENT_HEIGHT, size=0.78, tones=(0.92, 0.78)
         ),
-        "food": PieceStyle(SPHERE, height=0.56, size=0.56, lift=0.04, glow=(2.2, 1.6)),
+        "food": PieceStyle(
+            SPHERE,
+            height=FOOD_HEIGHT,
+            size=0.56,
+            lift=0.04,
+            glow=(2.2, 1.6),
+            extras=_foodStem,
+        ),
         "powerup": PieceStyle(
             CAPSULE, height=0.7, size=0.42, lift=0.1, glow=(2.6, 2.4)
         ),

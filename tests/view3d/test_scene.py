@@ -328,3 +328,19 @@ def test_a_dark_power_up_line_is_lifted_so_it_reads_on_the_dark_backdrop(game):
     assert blue[2] > blue[0] and blue[2] > blue[1]  # still reads as blue
     # a colour already bright enough is left as it is
     assert labels["[*] Invincible"].color[:3] == (1.0, 215 / 255.0, 0.0)
+
+
+def test_food_wears_a_stem_and_leaf_so_it_never_reads_as_a_body_segment():
+    # a segment grown from food wears the food's colour, as in 2D, so the
+    # food itself needs a shape a segment never has
+    from preponderous.graphik.grid3d import GridBoard, Piece
+
+    from strata_view.scene import LEAF_COLOR, STEM_COLOR, THEME
+
+    board = GridBoard(3, 3, THEME)
+    red = (1.0, 0.0, 0.0)
+    food, _ = board.pieceShapes([Piece("f", 1, 1, "food", color=red)])
+    body, _ = board.pieceShapes([Piece("b", 1, 1, "body", color=red)])
+    colors = [tuple(shape.color[:3]) for shape in food]
+    assert STEM_COLOR in colors and LEAF_COLOR in colors
+    assert len(body) == 1
