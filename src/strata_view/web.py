@@ -29,8 +29,10 @@ the bottom (graphik's TouchKeys, the keybindings' TOUCH_*_KEYS), in both
 views: a tap on one posts the key it names to pygame's queue, so the 2D
 loop's own handler (or the shop's) does the rest. In 3D the keys are part
 of the HUD and the board is framed above them (the view's insets); in 2D the
-canvas is made taller by the bar's height and the game draws on the part
-above it (a subsurface), so the bar never covers the board.
+canvas is made the page's shape (fillPage), the bar goes along its bottom
+and the game draws on a part in the middle of the rest (a subsurface), so
+the bar never covers the board and no bands of the page's grey are left
+around a small canvas.
 
 If the 3D view can't start, the 2D view stays and the page and the banner
 say why; a page in 2D downloads nothing of the 3D view until it is asked
@@ -79,6 +81,34 @@ HUD_TOP_NARROW, HUD_TOP_WIDE = 100, 72
 # controls line (one line on a touch screen, where the keys are buttons;
 # wrapped to three on a phone without them).
 HINT_LINE = 20
+
+
+def fillPage(width, height, band, pageWidth, pageHeight):
+    """For the 2D game on a touch screen: (canvasWidth, canvasHeight, left,
+    top). A `width` x `height` game with a `band`-pixel bar of keys under it
+    is a canvas of another shape than a phone's page, so the browser fits it
+    with bands of the page's grey left over (above and below it on a phone
+    held upright). The canvas is made the page's shape instead, as many
+    pixels across (upright) or down (on its side) as before, so the browser
+    fits it at the same scale and it fills the page; the bar goes along its
+    bottom and the game, at its own size, in the middle of the rest, from
+    (left, top)."""
+    total = height + band
+    if pageWidth <= 0 or pageHeight <= 0:
+        return width, total, 0, 0
+    if pageHeight * width >= pageWidth * total:
+        # taller than the canvas (a phone held upright): fitted by its width
+        canvasWidth = width
+        canvasHeight = max(total, int(width * pageHeight / float(pageWidth)))
+    else:
+        canvasWidth = max(width, int(total * pageWidth / float(pageHeight)))
+        canvasHeight = total
+    return (
+        canvasWidth,
+        canvasHeight,
+        (canvasWidth - width) // 2,
+        (canvasHeight - band - height) // 2,
+    )
 
 
 class BrowserPage:
@@ -180,6 +210,8 @@ class WebOphidian(Ophidian):
         self.screen2D = None
         self.band2D = 0
         self.barGraphik = None
+        # where the game's part of that window starts (fillPage)
+        self.board2DAt = (0, 0)
         # a press that went down on an on-screen key in 3D: its release is
         # the key's too, not a gesture
         self.swallowRelease = False
@@ -195,9 +227,11 @@ class WebOphidian(Ophidian):
         return self.shopKeys if self.shopOpen else self.boardKeys
 
     def initializeGameDisplay(self):
-        """On a touch screen, the 2D window is the game's size plus the bar
-        of on-screen keys below it, and the game draws on the part above
-        (self.gameDisplay, a subsurface), so the bar never covers it."""
+        """On a touch screen, the 2D window is the page's shape (fillPage):
+        the bar of on-screen keys along its bottom, and the game, at its own
+        size, drawing on a part in the middle of the rest (self.gameDisplay,
+        a subsurface), so the bar never covers it. Around the game's part is
+        the bar's colour, not the page's grey."""
         if not self.touch or self.config.useTextUI:
             super().initializeGameDisplay()
             return
@@ -209,8 +243,13 @@ class WebOphidian(Ophidian):
         )
         # not RESIZABLE: under pygbag that is given a square of the page's
         # choosing, which would lose the bar's room
-        self.screen2D = self.pygame.display.set_mode((width, height + self.band2D))
-        self.gameDisplay = self.screen2D.subsurface((0, 0, width, height))
+        canvasWidth, canvasHeight, left, top = fillPage(
+            width, height, self.band2D, pageWidth, pageHeight
+        )
+        self.screen2D = self.pygame.display.set_mode((canvasWidth, canvasHeight))
+        self.screen2D.fill(self.boardKeys.barColor)
+        self.board2DAt = (left, top)
+        self.gameDisplay = self.screen2D.subsurface((left, top, width, height))
         self.barGraphik = Graphik(self.screen2D)
         fit = getattr(self.page, "fitCanvas", None)
         if fit is not None:
@@ -381,7 +420,11 @@ class WebOphidian(Ophidian):
         The camera looks north across the board, so screen right is east
         and screen up is north, as in 2D."""
         if not self.pointerOn3D():
-            return super().handlePointerGesture(downAt, upAt)
+            # the 2D rule, in the game's part of the window
+            left, top = self.board2DAt
+            return super().handlePointerGesture(
+                (downAt[0] - left, downAt[1] - top), (upAt[0] - left, upAt[1] - top)
+            )
         dx = upAt[0] - downAt[0]
         dy = upAt[1] - downAt[1]
         if math.hypot(dx, dy) < SWIPE_THRESHOLD_PIXELS:

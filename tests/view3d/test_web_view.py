@@ -802,17 +802,77 @@ def test_on_a_touch_screen_the_2d_window_has_room_for_the_bar_below_the_game(pho
     game, page = phone
     width, height = game.config.displayWidth, game.config.displayHeight
     assert game.gameDisplay.get_size() == (width, height)  # the game's part
-    assert game.screen2D.get_size() == (width, height + game.band2D)
+    canvasWidth, canvasHeight = game.screen2D.get_size()
+    # the page's shape, so the browser fits it to the whole phone
+    assert canvasWidth == width
+    assert abs(canvasHeight / float(canvasWidth) - PHONE[1] / float(PHONE[0])) < 0.01
     assert game.band2D > 0 and page.fitted == 1
+    left, top = game.gameDisplay.get_abs_offset()
+    assert left == 0 and top + height <= canvasHeight - game.band2D
     scale, portrait = game.scale2D()
     assert portrait
+    assert abs(scale - PHONE[0] / float(width)) < 1e-9  # as big as before
     for slot in slots2D(game).values():
         # below the game's part, and a finger's size on the phone
-        assert slot.y >= height
+        assert slot.y >= top + height
         assert slot.width * scale >= 44 - 1e-6 and slot.height * scale >= 44 - 1e-6
     # a press on the board is still a gesture, and lands on the game's part
-    game.handlePointerDown((100, 100))
-    assert game.pointerDownAt == (100, 100)
+    game.handlePointerDown((100, top + 100))
+    assert game.pointerDownAt == (100, top + 100)
+
+
+@pytest.mark.parametrize(
+    "page", [(390, 844), (360, 640), (844, 390), (1024, 768), (500, 500)]
+)
+def test_fill_page_makes_the_canvas_the_pages_shape_at_the_same_scale(page):
+    from strata_view.web import fillPage
+
+    width = height = 500
+    band = 90
+    canvasWidth, canvasHeight, left, top = fillPage(width, height, band, *page)
+    before = min(page[0] / float(width), page[1] / float(height + band))
+    after = min(page[0] / float(canvasWidth), page[1] / float(canvasHeight))
+    assert abs(after - before) < 0.01 * before  # the board is no smaller
+    # the page's shape (to a pixel), with the game and the bar inside it
+    assert abs(canvasWidth * page[1] - canvasHeight * page[0]) <= max(page)
+    assert canvasWidth >= width and canvasHeight >= height + band
+    assert 0 <= left and left + width <= canvasWidth
+    assert 0 <= top and top + height <= canvasHeight - band
+    # in the middle of what the bar leaves
+    assert abs(left - (canvasWidth - width - left)) <= 1
+    assert abs(top - (canvasHeight - band - height - top)) <= 1
+
+
+def test_the_2d_canvas_fills_the_phone_with_the_bars_colour_around_the_game(
+    phone, monkeypatch
+):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    playFrames(game, monkeypatch, [[]])
+    left, top = game.board2DAt
+    assert top > 0
+    keys = game.activeTouchKeys()
+    # above the game's part is the bar's colour, not the page's grey
+    assert game.screen2D.get_at((5, top // 2))[:3] == keys.barColor
+    assert game.screen2D.get_at((5, top + 5))[:3] != keys.barColor
+
+
+def test_a_2d_tap_steers_from_the_head_where_the_game_draws_it(phone):
+    from controls.keybindings import DIRECTION_LEFT, DIRECTION_UP
+
+    game, page = phone
+    left, top = game.board2DAt
+    assert top > 2 * game.locationHeight
+    location = game.getLocation(game.selectedSnakePart)
+    headX = (location.getX() + 0.5) * game.locationWidth
+    headY = (location.getY() + 0.5) * game.locationHeight
+    game.selectedSnakePart.setDirection(DIRECTION_LEFT)
+    game.changedDirectionThisTick = False
+    # a tap two cells above the head, in the window's pixels: the game's part starts `top`
+    # lower down, so measured from the window's top it would read as below the head
+    tap = (left + headX, top + headY - 2 * game.locationHeight)
+    game.handlePointerGesture(tap, tap)
+    assert game.selectedSnakePart.getDirection() == DIRECTION_UP
 
 
 def test_the_2d_bar_is_drawn_under_the_game(phone, monkeypatch):
