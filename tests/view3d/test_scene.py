@@ -345,3 +345,15 @@ def test_food_wears_a_stem_and_leaf_so_it_never_reads_as_a_body_segment():
     colors = [tuple(shape.color[:3]) for shape in food]
     assert STEM_COLOR in colors and LEAF_COLOR in colors
     assert len(body) == 1
+
+
+def test_the_death_frames_box_stays_above_the_banner_on_a_phone(game):
+    # on a phone the box ran down under the story banner's line
+    game.strataBanner = "Skin selected: Default"
+    game.strataOverlayLines = ["The ophidian collides with itself and ceases to be."] + [
+        "line %d of a long obituary" % i for i in range(30)
+    ]
+    labels, panels = scene.hudOverlay(game, 390, 844)
+    box = [p for p in panels if p.color == (0.05, 0.03, 0.03, 0.78)][0]
+    banner = [l for l in labels if l.text.startswith("Skin selected")][0]
+    assert box.y + box.height <= banner.y

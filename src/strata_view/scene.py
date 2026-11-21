@@ -636,9 +636,12 @@ def hudOverlay(game, width, height):
             bottom -= 20
             labels.append(Label(line, 18, bottom, CONTROLS_HINT_SIZE, DIM_TEXT_COLOR))
     banner = getattr(game, "strataBanner", None)
+    # the top of what is drawn along the bottom (the banner, else the controls)
+    footerTop = bottom
     if banner:
         lines = bannerLines(banner, width)
         top = bottom - 8 - BANNER_LINE_HEIGHT * len(lines)
+        footerTop = top
         for index, line in enumerate(lines):
             labels.append(
                 Label(
@@ -672,7 +675,9 @@ def hudOverlay(game, width, height):
     # below the HUD's lines (score, level, upgrades, running power-ups), so
     # it covers none of them
     top = max(90, lineY + 4)
-    room = max(1, int((height - top - 60) / 28))
+    # and above the banner and the controls, so its box never runs under them
+    # (on a phone the death frame's box ran under "Skin selected: Default")
+    room = max(1, int((min(height - 60, footerTop - 8) - top - 24) / 28))
     if len(overlay) > room:
         overlay = overlay[: room - 1] + ["..."]
     if overlay:
