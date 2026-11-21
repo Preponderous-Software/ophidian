@@ -30,7 +30,7 @@ def test_pygbag_builds_with_graphiks_template():
 
 
 def test_the_relay_is_fetched_from_a_pinned_strata_release_next_to_the_page():
-    assert re.search(r'STRATA_RELAY_VERSION: "0\.9\.0"', WORKFLOW)
+    assert re.search(r'STRATA_RELAY_VERSION: "0\.9\.1"', WORKFLOW)
     assert (
         "python -m preponderous.graphik.grid3d.relay --strata "
         "${{ env.STRATA_RELAY_VERSION }} --dest src/build/web"
