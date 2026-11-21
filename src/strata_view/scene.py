@@ -62,6 +62,10 @@ CLEAR_COLOR = (0.10, 0.12, 0.16, 1.0)
 TAIL_FADE = 0.38
 TAIL_LIGHT = (0.55, 0.56, 0.60)
 DARK_LUMINANCE = 0.22
+# A power-up's HUD line is written in the power-up's colour (as the 2D meter
+# fills in it), lifted towards white until it is at least this bright, so a
+# dark one (the speed boost's pure blue) still reads on the dark backdrop.
+HUD_TEXT_MIN_LUMINANCE = 0.5
 # The 2D window holds its obituary screen this long (Ophidian.renderObituaryScreen).
 OBITUARY_SCREEN_SECONDS = 1.5
 OBITUARY_TEXT_SIZE = 16
@@ -200,6 +204,18 @@ def boardShapes(columns, rows, collision=False):
 def luminance(color):
     r, g, b = color[:3]
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def readableOnDark(color, minimum=HUD_TEXT_MIN_LUMINANCE):
+    """`color` (0-1 r, g, b) mixed with white just enough to reach `minimum`
+    luminance, so it reads on the window's dark backdrop; a colour already
+    that bright is left as it is. Its hue stays recognisable."""
+    color = tuple(color[:3])
+    have = luminance(color)
+    if have >= minimum:
+        return color
+    amount = (minimum - have) / max(1e-6, 1.0 - have)
+    return tuple(c + (1.0 - c) * amount for c in color)
 
 
 def bodyShade(color, fraction):
@@ -554,7 +570,11 @@ def hudOverlay(game, width, height):
                 18,
                 lineY,
                 fitSize(line, width, 14) if narrow else 14,
-                rgba(rgb(status["color"])) if status.get("color") else TEXT_COLOR,
+                (
+                    rgba(readableOnDark(rgb(status["color"])))
+                    if status.get("color")
+                    else TEXT_COLOR
+                ),
             )
         )
         lineY += 22

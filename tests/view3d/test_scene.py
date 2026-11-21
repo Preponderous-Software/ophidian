@@ -300,3 +300,31 @@ def test_f11_without_a_fullscreen_capable_strata_says_so(game):
     game.handleScancode(68)  # F11
     assert game.config.fullscreen is False
     assert "Fullscreen" in game.strataBanner
+
+
+def test_a_dark_power_up_line_is_lifted_so_it_reads_on_the_dark_backdrop(game):
+    # the speed boost is pure blue, which all but vanished on the dark window
+    from strata_view.scene import HUD_TEXT_MIN_LUMINANCE, hudOverlay, luminance
+
+    game.getActivePowerUpStatuses = lambda: [
+        {
+            "symbol": ">",
+            "label": "Speed boost",
+            "secondsRemaining": 4.0,
+            "fractionRemaining": 0.8,
+            "color": (0, 0, 255),
+        },
+        {
+            "symbol": "*",
+            "label": "Invincible",
+            "secondsRemaining": 4.0,
+            "fractionRemaining": 0.8,
+            "color": (255, 215, 0),
+        },
+    ]
+    labels = {label.text.split(":")[0]: label for label in hudOverlay(game, 900, 700)[0]}
+    blue = labels["[>] Speed boost"].color
+    assert luminance(blue) >= HUD_TEXT_MIN_LUMINANCE - 1e-6
+    assert blue[2] > blue[0] and blue[2] > blue[1]  # still reads as blue
+    # a colour already bright enough is left as it is
+    assert labels["[*] Invincible"].color[:3] == (1.0, 215 / 255.0, 0.0)
