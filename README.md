@@ -4,6 +4,10 @@
 
 This game allows you to control an ever-increasingly growing ophidian in a virtual environment. 
 
+![The snake, seventeen pieces long, crossing a level-4 board in the 3D window: a pale green head, a red body that turns a corner, and a red food pickup](assets/3d-hero.png)
+
+<sub>The 3D window at level 4, rendered by `python3 tools/strata_snapshot.py --level 4 --ticks 150 --width 1280 --height 800` (the game itself, on its autopilot).</sub>
+
 ## Play in your browser
 Ophidian also runs in a web browser, phones included, with nothing to install:
 
@@ -25,6 +29,12 @@ there: progress (`save.json`) lasts only as long as the tab, and no usage
 reporting is sent at all. There is no quit key, as
 closing the tab ends the game.
 
+### Play in 3D or 2D
+- **3D** (the default): https://ophidian.play.danielstephenson.dev
+- **2D**: https://ophidian.play.danielstephenson.dev/?view=2d
+
+<img src="assets/3d-phone.png" width="260" align="right" alt="Ophidian in 3D on a phone held upright: the board fills the width, a seven-piece red snake with a pink head and a yellow power-up on it, the score, level and progress at the top, the controls below and the 2D button in the top-right corner">
+
 The game starts in 3D, as on the desktop (the 3D view, about 1.3 MB, loads
 alongside the game). The **2D** button at the top right switches to the 2D
 view, and **3D** back, in the middle of a run if you like: it is the same game
@@ -34,6 +44,8 @@ limit and the death screens work in both. The browser remembers your choice;
 downloads nothing of the 3D view). If your browser can't show 3D (no WebGL 2,
 say), the 2D view stays and the page says why. The page is built with graphik's pygbag template, and the build puts Strata's
 prebuilt grid relay, which draws the 3D view, next to it (see `browser.yml`).
+
+<br clear="right">
 
 ## Requirements
 - Python 3.9 or newer (developed and tested on 3.10); the graphik release in `requirements.txt` needs 3.9
@@ -68,6 +80,10 @@ graphics driver, macOS), the game says why and opens the 2D window instead.
 in both windows and in the text UI: the shop, pause, skins, restart, the
 obituary screen and the rest. The snake glides between cells in 3D;
 `--reduced-motion` moves it a cell at a time instead.
+
+![The 3D window during play: the snake grows from eight to seventeen pieces as it winds round the board towards each pickup, gliding between cells](assets/3d-play.gif)
+
+<sub>About thirteen seconds of level 4, two frames a tick (half-way through each slide, then on the cell), rendered by `tools/strata_snapshot.py` with `--slide 0.5` and `--slide 1` for ticks 71 to 150.</sub>
 
 ### Graphical UI (2D)
 Run the game in the classic pygame window:
