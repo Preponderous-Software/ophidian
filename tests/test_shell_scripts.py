@@ -36,7 +36,7 @@ PYTHON_CALLING_SCRIPTS = ["test.sh", "run.sh"]
 # the `requires-python` each graphik release declares in its pyproject.toml.
 # Both scripts need graphik - test.sh's suite imports it, and run.sh starts
 # the graphical UI - so README's minimum can't sit below it (issue #207).
-GRAPHIK_REQUIRES_PYTHON = {"v0.5.0": (3, 9), "v0.5.1": (3, 9)}
+GRAPHIK_REQUIRES_PYTHON = {"v0.5.0": (3, 9), "v0.5.1": (3, 9), "v0.5.2": (3, 9), "v0.5.3": (3, 9)}
 
 
 def _read(name):

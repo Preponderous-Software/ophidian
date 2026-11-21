@@ -88,8 +88,9 @@ def test_the_paused_notice_and_the_obituary_get_a_backdrop(game):
     built = scene.buildScene(game, 900, 700)
     texts = [label.text for label in built.labels]
     assert "Paused (space to resume)" in texts and "It ended." in texts
-    # the progress bar's two panels, then the notice's and the obituary's
-    assert len(built.panels) == 4
+    # the progress bar's three panels (backdrop, fill, goal mark), then the
+    # notice's and the obituary's
+    assert len(built.panels) == 5
 
 
 def test_arrow_keys_steer_through_the_text_ui_key_tables(game):
@@ -300,3 +301,59 @@ def test_f11_without_a_fullscreen_capable_strata_says_so(game):
     game.handleScancode(68)  # F11
     assert game.config.fullscreen is False
     assert "Fullscreen" in game.strataBanner
+
+
+def test_a_dark_power_up_line_is_lifted_so_it_reads_on_the_dark_backdrop(game):
+    # the speed boost is pure blue, which all but vanished on the dark window
+    from strata_view.scene import HUD_TEXT_MIN_LUMINANCE, hudOverlay, luminance
+
+    game.getActivePowerUpStatuses = lambda: [
+        {
+            "symbol": ">",
+            "label": "Speed boost",
+            "secondsRemaining": 4.0,
+            "fractionRemaining": 0.8,
+            "color": (0, 0, 255),
+        },
+        {
+            "symbol": "*",
+            "label": "Invincible",
+            "secondsRemaining": 4.0,
+            "fractionRemaining": 0.8,
+            "color": (255, 215, 0),
+        },
+    ]
+    labels = {label.text.split(":")[0]: label for label in hudOverlay(game, 900, 700)[0]}
+    blue = labels["[>] Speed boost"].color
+    assert luminance(blue) >= HUD_TEXT_MIN_LUMINANCE - 1e-6
+    assert blue[2] > blue[0] and blue[2] > blue[1]  # still reads as blue
+    # a colour already bright enough is left as it is
+    assert labels["[*] Invincible"].color[:3] == (1.0, 215 / 255.0, 0.0)
+
+
+def test_food_wears_a_stem_and_leaf_so_it_never_reads_as_a_body_segment():
+    # a segment grown from food wears the food's colour, as in 2D, so the
+    # food itself needs a shape a segment never has
+    from preponderous.graphik.grid3d import GridBoard, Piece
+
+    from strata_view.scene import LEAF_COLOR, STEM_COLOR, THEME
+
+    board = GridBoard(3, 3, THEME)
+    red = (1.0, 0.0, 0.0)
+    food, _ = board.pieceShapes([Piece("f", 1, 1, "food", color=red)])
+    body, _ = board.pieceShapes([Piece("b", 1, 1, "body", color=red)])
+    colors = [tuple(shape.color[:3]) for shape in food]
+    assert STEM_COLOR in colors and LEAF_COLOR in colors
+    assert len(body) == 1
+
+
+def test_the_death_frames_box_stays_above_the_banner_on_a_phone(game):
+    # on a phone the box ran down under the story banner's line
+    game.strataBanner = "Skin selected: Default"
+    game.strataOverlayLines = ["The ophidian collides with itself and ceases to be."] + [
+        "line %d of a long obituary" % i for i in range(30)
+    ]
+    labels, panels = scene.hudOverlay(game, 390, 844)
+    box = [p for p in panels if p.color == (0.05, 0.03, 0.03, 0.78)][0]
+    banner = [l for l in labels if l.text.startswith("Skin selected")][0]
+    assert box.y + box.height <= banner.y

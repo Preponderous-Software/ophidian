@@ -11,7 +11,11 @@ Ophidian also runs in a web browser, phones included, with nothing to install:
 - https://danielstephenson.dev/play (every browser game in one place)
 
 Click or tap the page once to start it. On a phone, swipe to steer, or tap a
-spot on the board to turn towards it. The browser build is the graphical UI
+spot on the board to turn towards it; the keys a phone doesn't have are buttons
+along the bottom of the screen (**Pause**, **Shop**, **Retry**, **Skin** and
+**Speed**, and in the shop **Up**, **Down**, **Buy** and **Close**), in the 2D
+and the 3D view alike, each pressing the key it names. They show only on a touch
+screen, below the board, never over it. The browser build is the graphical UI
 built with [pygbag](https://github.com/pygame-web/pygbag) from `src/`, whose
 `main.py` is its entry point (`python -m pygbag --build src` builds it into
 `src/build/web`); `.github/workflows/browser.yml` builds it on every pull request

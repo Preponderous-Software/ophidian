@@ -78,6 +78,8 @@ from controls.keybindings import (
 POWER_UP_INDICATOR_ROW_HEIGHT = 24
 POWER_UP_INDICATOR_METER_WIDTH = 140
 POWER_UP_INDICATOR_METER_HEIGHT = 4
+# the mark on the level-progress bar where the level ends
+PROGRESS_GOAL_WIDTH = 4
 
 # Type of the obituary screen's text, and the gutter left either side of it.
 # The font has to be named here as well as inside Graphik.drawText, because
@@ -895,6 +897,12 @@ class Ophidian:
             return None
         return self.performAction(action)
 
+    def handlePointerDown(self, position):
+        """A touch or mouse press going down: where it went down is kept
+        until it comes up (handlePointerGesture). The browser game reads a
+        press on its on-screen keys here first (strata_view.web)."""
+        self.pointerDownAt = position
+
     def handlePointerGesture(self, downAt, upAt):
         """Steers the snake from a touch (or mouse) press, for a phone,
         which has no keyboard.
@@ -1337,8 +1345,19 @@ class Ophidian:
         self.spawnStartingSegments(startingSegments)
         ophidianName = self.saveManager.data["ophidianName"]
         self.notify(f"{ophidianName} enters {biome['name']}. {biome['flavorText']}")
+        if self.level == 1 and self.saveManager.data["lifetimeStats"].get(
+            "highestLevelReached", 1
+        ) <= 1:
+            # until a level has been cleared, every UI says what the run is for
+            self.notify(self.goalMessage())
         # after the body, so that no segment is ever laid over the pickup
         self.spawnPickup()
+
+    def goalMessage(self):
+        """What a run is for, in one line: how to grow and when a level ends
+        (the share the progress bar fills towards)."""
+        required = int(round(self.config.levelProgressPercentageRequired * 100))
+        return f"Eat food to grow. Fill {required}% of the board to clear the level."
 
     def endOfTick(self):
         """Closes out one movement step, for both UI loops.
@@ -1493,7 +1512,7 @@ class Ophidian:
                 elif event.type == self.pygame.MOUSEBUTTONDOWN:
                     # a touch arrives as a mouse press as well, in a
                     # browser and on the desktop alike
-                    self.pointerDownAt = event.pos
+                    self.handlePointerDown(event.pos)
                 elif event.type == self.pygame.MOUSEBUTTONUP:
                     if self.pointerDownAt is not None:
                         self.handlePointerGesture(self.pointerDownAt, event.pos)
@@ -1536,6 +1555,13 @@ class Ophidian:
                 )
             self.pygame.draw.rect(
                 self.gameDisplay, self.config.black, (0, y - 20, x, 20), 1
+            )
+            # where the level ends, so the bar shows how far there is to go
+            goalX = int(x * self.config.levelProgressPercentageRequired)
+            self.pygame.draw.rect(
+                self.gameDisplay,
+                self.config.white,
+                (goalX - PROGRESS_GOAL_WIDTH // 2, y - 20, PROGRESS_GOAL_WIDTH, 20),
             )
 
             self.drawHud()

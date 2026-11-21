@@ -404,7 +404,9 @@ def test_a_tap_on_the_3d_view_steers_from_the_head_as_drawn_in_3d(
     page.on = True
     game.update3D()
     game.selectedSnakePart.setDirection(facing)
-    head = scene.headScreenPosition(game, *PHONE)
+    # where the view draws the head (its camera keeps the phone's HUD clear)
+    location = game.getLocation(game.selectedSnakePart)
+    head = game.view3d.cellScreenPosition(location.getX(), location.getY(), y=0.4)
     tap = (head[0] + offset[0], head[1] + offset[1])
     press(page, tap, tap)
 
@@ -720,3 +722,370 @@ def test_a_page_starting_in_3d_gets_the_3d_view_on_the_first_frame(
         }
     finally:
         pygame.quit()
+
+
+# -- the on-screen keys on a touch screen (graphik's TouchKeys)
+
+
+class TouchPage(Page):
+    """A phone's page: a touch screen."""
+
+    def __init__(self, size=PHONE, **kwargs):
+        super().__init__(size=size, **kwargs)
+        self.fitted = 0
+
+    def touchScreen(self):
+        return True
+
+    def fitCanvas(self):
+        self.fitted += 1
+
+
+@pytest.fixture
+def phone(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    page = TouchPage()
+    game = WebOphidian(page=page)
+    game.saveManager.save = lambda: None
+    try:
+        yield game, page
+    finally:
+        pygame.quit()
+
+
+def slotCentre(slot):
+    return (int(slot.x + slot.width / 2), int(slot.y + slot.height / 2))
+
+
+def slots2D(game):
+    width, height = game.screen2D.get_size()
+    scale, portrait = game.scale2D()
+    return {
+        s.label: s
+        for s in game.activeTouchKeys().layout(width, height, scale, portrait)
+    }
+
+
+def tap2D(position):
+    return [
+        pygame.event.Event(pygame.MOUSEBUTTONDOWN, pos=position, button=1),
+        pygame.event.Event(pygame.MOUSEBUTTONUP, pos=position, button=1),
+    ]
+
+
+def slots3D(game):
+    view = game.view3d
+    return {s.label: s for s in game.activeTouchKeys().layout(view.width, view.height)}
+
+
+def test_the_keys_name_every_keyboard_only_action():
+    from controls.keybindings import TOUCH_BOARD_KEYS, TOUCH_SHOP_KEYS
+
+    board = {key for _, key in TOUCH_BOARD_KEYS}
+    assert board == {"space", "p", "r", "c", "l"}  # pause, shop, restart, skin, speed
+    assert {key for _, key in TOUCH_SHOP_KEYS} == {"up", "down", "return", "escape"}
+
+
+def test_without_a_touch_screen_there_are_no_keys(game, page):
+    assert game.screen2D is None
+    assert game.gameDisplay.get_size() == (
+        game.config.displayWidth,
+        game.config.displayHeight,
+    )
+    page.on = True
+    game.update3D()
+    assert "Pause" not in hudText(page)
+    assert game.touchBand3D() == 0
+
+
+def test_on_a_touch_screen_the_2d_window_has_room_for_the_bar_below_the_game(phone):
+    game, page = phone
+    width, height = game.config.displayWidth, game.config.displayHeight
+    assert game.gameDisplay.get_size() == (width, height)  # the game's part
+    canvasWidth, canvasHeight = game.screen2D.get_size()
+    # the page's shape, so the browser fits it to the whole phone
+    assert canvasWidth == width
+    assert abs(canvasHeight / float(canvasWidth) - PHONE[1] / float(PHONE[0])) < 0.01
+    assert game.band2D > 0 and page.fitted == 1
+    left, top = game.gameDisplay.get_abs_offset()
+    assert left == 0 and top + height <= canvasHeight - game.band2D
+    scale, portrait = game.scale2D()
+    assert portrait
+    assert abs(scale - PHONE[0] / float(width)) < 1e-9  # as big as before
+    for slot in slots2D(game).values():
+        # below the game's part, and a finger's size on the phone
+        assert slot.y >= top + height
+        assert slot.width * scale >= 44 - 1e-6 and slot.height * scale >= 44 - 1e-6
+    # a press on the board is still a gesture, and lands on the game's part
+    game.handlePointerDown((100, top + 100))
+    assert game.pointerDownAt == (100, top + 100)
+
+
+@pytest.mark.parametrize(
+    "page", [(390, 844), (360, 640), (844, 390), (1024, 768), (500, 500)]
+)
+def test_fill_page_makes_the_canvas_the_pages_shape_at_the_same_scale(page):
+    from strata_view.web import fillPage
+
+    width = height = 500
+    band = 90
+    canvasWidth, canvasHeight, left, top = fillPage(width, height, band, *page)
+    before = min(page[0] / float(width), page[1] / float(height + band))
+    after = min(page[0] / float(canvasWidth), page[1] / float(canvasHeight))
+    assert abs(after - before) < 0.01 * before  # the board is no smaller
+    # the page's shape (to a pixel), with the game and the bar inside it
+    assert abs(canvasWidth * page[1] - canvasHeight * page[0]) <= max(page)
+    assert canvasWidth >= width and canvasHeight >= height + band
+    assert 0 <= left and left + width <= canvasWidth
+    assert 0 <= top and top + height <= canvasHeight - band
+    # in the middle of what the bar leaves
+    assert abs(left - (canvasWidth - width - left)) <= 1
+    assert abs(top - (canvasHeight - band - height - top)) <= 1
+
+
+def test_the_2d_canvas_fills_the_phone_with_the_bars_colour_around_the_game(
+    phone, monkeypatch
+):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    playFrames(game, monkeypatch, [[]])
+    left, top = game.board2DAt
+    assert top > 0
+    keys = game.activeTouchKeys()
+    # above the game's part is the bar's colour, not the page's grey
+    assert game.screen2D.get_at((5, top // 2))[:3] == keys.barColor
+    assert game.screen2D.get_at((5, top + 5))[:3] != keys.barColor
+
+
+def test_a_2d_tap_steers_from_the_head_where_the_game_draws_it(phone):
+    from controls.keybindings import DIRECTION_LEFT, DIRECTION_UP
+
+    game, page = phone
+    left, top = game.board2DAt
+    assert top > 2 * game.locationHeight
+    location = game.getLocation(game.selectedSnakePart)
+    headX = (location.getX() + 0.5) * game.locationWidth
+    headY = (location.getY() + 0.5) * game.locationHeight
+    game.selectedSnakePart.setDirection(DIRECTION_LEFT)
+    game.changedDirectionThisTick = False
+    # a tap two cells above the head, in the window's pixels: the game's part starts `top`
+    # lower down, so measured from the window's top it would read as below the head
+    tap = (left + headX, top + headY - 2 * game.locationHeight)
+    game.handlePointerGesture(tap, tap)
+    assert game.selectedSnakePart.getDirection() == DIRECTION_UP
+
+
+def test_the_2d_bar_is_drawn_under_the_game(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    playFrames(game, monkeypatch, [[]])
+    keys = game.activeTouchKeys()
+    width, height = game.screen2D.get_size()
+    assert game.screen2D.get_at((1, height - 1))[:3] == keys.barColor
+    pause = slots2D(game)["Pause"]
+    assert game.screen2D.get_at((int(pause.x) + 2, int(pause.y) + 2))[:3] == keys.color
+
+
+def test_tapping_the_pause_and_speed_keys_in_2d(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    keys = slots2D(game)
+    game.config.limitTickSpeed = True
+    # each tap is a frame; the key it posts is read the frame after
+    playFrames(
+        game,
+        monkeypatch,
+        [tap2D(slotCentre(keys["Pause"])), [], tap2D(slotCentre(keys["Speed"])), []],
+    )
+    assert game.paused and game.config.limitTickSpeed is False
+    # a tap on a key never steers the snake
+    assert game.pointerDownAt is None
+
+
+def test_tapping_the_retry_key_restarts_the_run(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    restarts = []
+    monkeypatch.setattr(game, "restartRun", lambda: restarts.append(1))
+    playFrames(game, monkeypatch, [tap2D(slotCentre(slots2D(game)["Retry"])), []])
+    assert restarts == [1]
+
+
+def test_tapping_the_skin_key_cycles_the_skin(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    cycled = []
+    monkeypatch.setattr(game, "cycleSelectedCosmetic", lambda: cycled.append(1))
+    playFrames(game, monkeypatch, [tap2D(slotCentre(slots2D(game)["Skin"])), []])
+    assert cycled == [1]
+
+
+def test_tapping_the_shop_key_opens_the_shop(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    opened = []
+
+    async def visit():
+        opened.append(1)
+        game.shopRequested = False
+
+    monkeypatch.setattr(game, "visitPygameShop", visit)
+    playFrames(game, monkeypatch, [tap2D(slotCentre(slots2D(game)["Shop"])), [], []])
+    assert opened == [1]
+
+
+def test_the_shops_keys_navigate_buy_and_close_it_in_2d(phone, monkeypatch):
+    game, page = phone
+    game.saveManager.data["currency"] = 1000
+    game.shopOpen = True  # the shop's keys are the bar's while it is open
+    keys = slots2D(game)
+    game.shopOpen = False
+    taps = [slotCentre(keys[label]) for label in ("Down", "Buy", "Close")]
+    realGet = pygame.event.get
+
+    def get(*args):
+        # each frame of the shop's loop: what was posted, then the next tap
+        return realGet() + (tap2D(taps.pop(0)) if taps else [])
+
+    monkeypatch.setattr(pygame.event, "get", get)
+    realSleep = asyncio.sleep
+    monkeypatch.setattr(asyncio, "sleep", lambda seconds=0, *a: realSleep(0))
+    asyncio.run(game.runPygameShop())
+    assert game.saveManager.data["currency"] < 1000
+    assert game.saveManager.data["purchasedUpgrades"]
+    assert not game.shopOpen and not taps
+
+
+def test_on_a_touch_screen_the_3d_view_frames_the_board_above_the_keys(phone):
+    game, page = phone
+    page.on = True
+    game.update3D()
+    view = game.view3d
+    band = game.touchBand3D()
+    assert band >= 44
+    top, bottom = view.insets
+    assert bottom > band  # the bar, the progress bar and the controls line
+    # the board's near edge stands above all of it
+    from preponderous.graphik.grid3d import projectToScreen
+
+    grid = game.environment.getGrid()
+    columns, rows = grid.getColumns(), grid.getRows()
+    camera = view.camera()
+    for x in (-columns / 2 - 0.35, columns / 2 + 0.35):
+        for z in (-rows / 2 - 0.35, rows / 2 + 0.35):
+            sx, sy = projectToScreen(camera, (x, -0.18, z), view.width, view.height)
+            assert top - 1 <= sy <= view.height - bottom + 1
+            assert 0 <= sx <= view.width
+    # the camera the page was sent is that one
+    sent = decoded(page, grid3dweb.VIEW)[-1]
+    assert sent["eye"] == pytest.approx(camera.eye, abs=1e-4)
+
+
+def test_the_3d_hud_carries_the_keys_and_keeps_its_text_above_them(phone):
+    game, page = phone
+    page.on = True
+    game.update3D()
+    hud = decoded(page, grid3dweb.HUD)[-1]
+    texts = [label["text"] for label in hud["labels"]]
+    for label in ("Pause", "Shop", "Retry", "Skin", "Speed"):
+        assert label in texts
+    assert "Swipe or tap to steer" in texts
+    band = game.touchBand3D()
+    keyLabels = set(slots3D(game))
+    for label in hud["labels"]:
+        if label["text"] not in keyLabels:
+            assert label["y"] + label["pixelSize"] <= PHONE[1] - band, label["text"]
+
+
+@pytest.mark.parametrize(
+    "label, check",
+    [
+        ("Pause", lambda g: g.paused),
+        ("Speed", lambda g: g.config.limitTickSpeed is False),
+    ],
+)
+def test_tapping_a_3d_key_does_what_its_key_does(phone, monkeypatch, label, check):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    game.config.limitTickSpeed = True
+    page.on = True
+    game.update3D()
+    position = slotCentre(slots3D(game)[label])
+    press(page, position, position)
+
+    game.update3D()  # reads the tap, posts the key
+    playFrames(game, monkeypatch, [[]])
+
+    assert check(game)
+    assert game.pointerDownAt is None and not game.swallowRelease
+
+
+def test_tapping_the_3d_retry_skin_and_shop_keys(phone, monkeypatch):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    calls = []
+    monkeypatch.setattr(game, "restartRun", lambda: calls.append("r"))
+    monkeypatch.setattr(game, "cycleSelectedCosmetic", lambda: calls.append("c"))
+
+    async def visit():
+        calls.append("p")
+        game.shopRequested = False
+
+    monkeypatch.setattr(game, "visitPygameShop", visit)
+    page.on = True
+    game.update3D()
+    for label in ("Retry", "Skin", "Shop"):
+        position = slotCentre(slots3D(game)[label])
+        press(page, position, position)
+        game.update3D()
+        playFrames(game, monkeypatch, [[], []])
+    assert calls == ["r", "c", "p"]
+
+
+def test_a_key_tap_in_3d_does_not_steer_and_a_swipe_after_it_still_does(
+    phone, monkeypatch
+):
+    game, page = phone
+    stopMoving(game, monkeypatch)
+    page.on = True
+    game.update3D()
+    game.selectedSnakePart.setDirection(DIRECTION_LEFT)
+    position = slotCentre(slots3D(game)["Skin"])
+    press(page, position, position)
+    game.update3D()
+    playFrames(game, monkeypatch, [[]])
+    assert game.selectedSnakePart.getDirection() == DIRECTION_LEFT
+    press(page, (195, 500), (195, 380))
+    game.update3D()
+    playFrames(game, monkeypatch, [[]])
+    assert game.selectedSnakePart.getDirection() == DIRECTION_UP
+
+
+def test_the_shops_keys_navigate_buy_and_close_it_in_3d(phone, monkeypatch):
+    game, page = phone
+    game.saveManager.data["currency"] = 1000
+    page.on = True
+    game.update3D()
+    realSleep = asyncio.sleep
+    monkeypatch.setattr(asyncio, "sleep", lambda seconds=0, *a: realSleep(0))
+    game.shopOpen = True
+    keys = slots3D(game)
+    game.shopOpen = False
+    for label in ("Down", "Buy", "Close"):
+        position = slotCentre(keys[label])
+        press(page, position, position)
+    frames = []
+    realShow = game.showShopIn3D
+
+    def show(*args):
+        frames.append(hudText(page))
+        realShow(*args)
+
+    monkeypatch.setattr(game, "showShopIn3D", show)
+    asyncio.run(game.runPygameShop())
+    assert game.saveManager.data["currency"] < 1000
+    assert game.saveManager.data["purchasedUpgrades"]
+    assert not game.shopOpen
+    # while it was open, the bar showed the shop's keys
+    assert any("Buy" in text and "Close" in text for text in frames)
+    assert "Pause" in hudText(page)  # the board's keys are back

@@ -53,12 +53,18 @@ class PygameShopScreen:
                         shopMessage = message
                     elif event.key in (self.pygame.K_ESCAPE, self.pygame.K_p):
                         viewingShop = False
+                else:
+                    self.handleOtherEvent(event)
             self.draw(upgrades, selectedIndex, shopMessage)
             self.pygame.display.update()
             # awaited rather than pygame.time.delay(16), which blocks: in a
             # browser (pygbag) the page only gets control back - and so only
             # paints, or delivers the next key - when this yields
             await asyncio.sleep(0.016)
+
+    def handleOtherEvent(self, event):
+        """An event the shop's keys don't use (a press, a resize). Nothing
+        here; the browser game reads a press on its on-screen keys."""
 
     def draw(self, upgrades, selectedIndex, shopMessage=None):
         gameDisplay = self.getGameDisplay()

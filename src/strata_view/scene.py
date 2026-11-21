@@ -62,6 +62,10 @@ CLEAR_COLOR = (0.10, 0.12, 0.16, 1.0)
 TAIL_FADE = 0.38
 TAIL_LIGHT = (0.55, 0.56, 0.60)
 DARK_LUMINANCE = 0.22
+# A power-up's HUD line is written in the power-up's colour (as the 2D meter
+# fills in it), lifted towards white until it is at least this bright, so a
+# dark one (the speed boost's pure blue) still reads on the dark backdrop.
+HUD_TEXT_MIN_LUMINANCE = 0.5
 # The 2D window holds its obituary screen this long (Ophidian.renderObituaryScreen).
 OBITUARY_SCREEN_SECONDS = 1.5
 OBITUARY_TEXT_SIZE = 16
@@ -78,6 +82,9 @@ PROGRESS_BACKDROP = (0.0, 0.0, 0.0, 0.85)
 PROGRESS_RED = (1.0, 0.0, 0.0, 0.9)
 PROGRESS_YELLOW = (1.0, 1.0, 0.0, 0.9)
 PROGRESS_GREEN = (0.0, 1.0, 0.0, 0.9)
+# the mark on the bar where the level ends
+PROGRESS_GOAL_WIDTH = 4
+PROGRESS_GOAL_COLOR = (1.0, 1.0, 1.0, 1.0)
 BANNER_SIZE = 18
 BANNER_LINE_HEIGHT = 24
 # Below this width (a phone held upright, in the browser's 3D view) the HUD
@@ -139,6 +146,25 @@ def _headEyes(piece, x, z, baseY):
     return shapes
 
 
+FOOD_HEIGHT = 0.56
+STEM_COLOR = (0.36, 0.22, 0.10)
+LEAF_COLOR = (0.42, 0.85, 0.30)
+
+
+def _foodStem(piece, x, z, baseY):
+    """A stem and a leaf on top of a piece of food. A segment the food grows
+    wears the food's colour (as in 2D), so without them the food on the board
+    and a body that has eaten read as the same red spheres; with them the
+    food reads as fruit at a glance."""
+    top = baseY + FOOD_HEIGHT
+    return [
+        Shape(CYLINDER, (x, top + 0.07, z), (0.09, 0.24, 0.09), rgba(STEM_COLOR)),
+        Shape(
+            SPHERE, (x + 0.14, top + 0.08, z), (0.30, 0.08, 0.16), rgba(LEAF_COLOR)
+        ),
+    ]
+
+
 # Ophidian's look. Piece colours come from the game (the snake's colour is
 # random per run), so the styles' own colours are only defaults.
 THEME = Theme(
@@ -151,7 +177,14 @@ THEME = Theme(
         "body": PieceStyle(
             SPHERE, height=SEGMENT_HEIGHT, size=0.78, tones=(0.92, 0.78)
         ),
-        "food": PieceStyle(SPHERE, height=0.56, size=0.56, lift=0.04, glow=(2.2, 1.6)),
+        "food": PieceStyle(
+            SPHERE,
+            height=FOOD_HEIGHT,
+            size=0.56,
+            lift=0.04,
+            glow=(2.2, 1.6),
+            extras=_foodStem,
+        ),
         "powerup": PieceStyle(
             CAPSULE, height=0.7, size=0.42, lift=0.1, glow=(2.6, 2.4)
         ),
@@ -200,6 +233,18 @@ def boardShapes(columns, rows, collision=False):
 def luminance(color):
     r, g, b = color[:3]
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def readableOnDark(color, minimum=HUD_TEXT_MIN_LUMINANCE):
+    """`color` (0-1 r, g, b) mixed with white just enough to reach `minimum`
+    luminance, so it reads on the window's dark backdrop; a colour already
+    that bright is left as it is. Its hue stays recognisable."""
+    color = tuple(color[:3])
+    have = luminance(color)
+    if have >= minimum:
+        return color
+    amount = (minimum - have) / max(1e-6, 1.0 - have)
+    return tuple(c + (1.0 - c) * amount for c in color)
 
 
 def bodyShade(color, fraction):
@@ -409,6 +454,17 @@ def progressOverlay(game, width, height):
                 0, top, filled, PROGRESS_BAR_HEIGHT, progressColor(fraction, required)
             )
         )
+    # where the level ends, so the bar shows how far there is to go (as 2D)
+    goal = width * max(0.0, min(1.0, required))
+    panels.append(
+        Panel(
+            goal - PROGRESS_GOAL_WIDTH / 2,
+            top,
+            PROGRESS_GOAL_WIDTH,
+            PROGRESS_BAR_HEIGHT,
+            PROGRESS_GOAL_COLOR,
+        )
+    )
     return [], panels
 
 
@@ -554,7 +610,11 @@ def hudOverlay(game, width, height):
                 18,
                 lineY,
                 fitSize(line, width, 14) if narrow else 14,
-                rgba(rgb(status["color"])) if status.get("color") else TEXT_COLOR,
+                (
+                    rgba(readableOnDark(rgb(status["color"])))
+                    if status.get("color")
+                    else TEXT_COLOR
+                ),
             )
         )
         lineY += 22
@@ -576,9 +636,12 @@ def hudOverlay(game, width, height):
             bottom -= 20
             labels.append(Label(line, 18, bottom, CONTROLS_HINT_SIZE, DIM_TEXT_COLOR))
     banner = getattr(game, "strataBanner", None)
+    # the top of what is drawn along the bottom (the banner, else the controls)
+    footerTop = bottom
     if banner:
         lines = bannerLines(banner, width)
         top = bottom - 8 - BANNER_LINE_HEIGHT * len(lines)
+        footerTop = top
         for index, line in enumerate(lines):
             labels.append(
                 Label(
@@ -612,7 +675,9 @@ def hudOverlay(game, width, height):
     # below the HUD's lines (score, level, upgrades, running power-ups), so
     # it covers none of them
     top = max(90, lineY + 4)
-    room = max(1, int((height - top - 60) / 28))
+    # and above the banner and the controls, so its box never runs under them
+    # (on a phone the death frame's box ran under "Skin selected: Default")
+    room = max(1, int((min(height - 60, footerTop - 8) - top - 24) / 28))
     if len(overlay) > room:
         overlay = overlay[: room - 1] + ["..."]
     if overlay:

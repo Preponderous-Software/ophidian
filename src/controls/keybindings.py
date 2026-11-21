@@ -167,6 +167,29 @@ WEB_CONTROLS_HINT = (
 )
 
 
+# The browser's on-screen keys on a touch screen (graphik's TouchKeys): a
+# phone has no keyboard, so every action the keys above name that a swipe or
+# a tap can't do has a labelled button, which presses the key it names
+# (pygame's name for it), so the same handlers run. The board's keys, then
+# the shop's (whose own loop reads Up, Down, Enter and Esc).
+TOUCH_BOARD_KEYS = (
+    ("Pause", "space"),
+    ("Shop", "p"),
+    ("Retry", "r"),
+    ("Skin", "c"),
+    ("Speed", "l"),
+)
+TOUCH_SHOP_KEYS = (
+    ("Up", "up"),
+    ("Down", "down"),
+    ("Buy", "return"),
+    ("Close", "escape"),
+)
+
+# The 3D view's controls line on a touch screen, where the keys are buttons.
+TOUCH_CONTROLS_HINT = "Swipe or tap to steer"
+
+
 # How far, in pixels, a touch has to travel between going down and coming
 # up before it counts as a swipe rather than a tap. Below it, the press is
 # read as a tap and aimed from the snake's head instead (see

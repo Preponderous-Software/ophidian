@@ -16,7 +16,7 @@ permissions:
 
 env:
   # the Strata release whose grid relay draws the browser's 3D view
-  STRATA_RELAY_VERSION: "0.9.0"
+  STRATA_RELAY_VERSION: "0.9.1"
 
 jobs:
   browser:
